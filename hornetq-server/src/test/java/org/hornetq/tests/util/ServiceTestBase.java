@@ -806,6 +806,25 @@ public abstract class ServiceTestBase extends UnitTestCase
       }
    }
 
+   /**
+    * Send durable text messages with a minimum size
+    */
+   public final void
+   sendTextMessages(ClientSession session, ClientProducer producer, int numMessages, int minSize) throws HornetQException
+   {
+      for (int i = 0; i < numMessages; i++)
+      {
+         ClientMessage message = createMessage(session, i, true);
+         StringBuilder builder = new StringBuilder();
+         for (int j = 0; j < minSize; j++)
+         {
+            builder.append('a');
+         }
+         message.getBodyBuffer().writeString(builder.toString());
+         producer.send(message);
+      }
+   }
+
    protected final ClientMessage
    createMessage(ClientSession session, int counter, boolean durable) throws HornetQException
    {
