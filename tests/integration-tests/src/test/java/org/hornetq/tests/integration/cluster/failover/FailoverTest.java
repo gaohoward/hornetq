@@ -770,6 +770,16 @@ public class FailoverTest extends FailoverTestBase
       sf = createSessionFactoryAndWaitForTopology(locator, 2);
    }
 
+   protected void createBlockOnAckSessionFactory() throws Exception
+   {
+      locator.setBlockOnNonDurableSend(true);
+      locator.setBlockOnDurableSend(true);
+      locator.setBlockOnAcknowledge(true);
+      locator.setReconnectAttempts(-1);
+
+      sf = createSessionFactoryAndWaitForTopology(locator, 2);
+   }
+
    @Test
    public void testConsumeTransacted() throws Exception
    {
