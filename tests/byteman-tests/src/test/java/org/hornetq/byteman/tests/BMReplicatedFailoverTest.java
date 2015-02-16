@@ -54,6 +54,7 @@ public class BMReplicatedFailoverTest extends ReplicatedFailoverTest
    private CountDownLatch actionEndLatch = new CountDownLatch(1);
 
    private FailoverControl failoverControl = new FailoverControl();
+   private String repNodeId;
 
    public static void checkReplicationPacket(ReplicationStartSyncMessage packet)
    {
@@ -62,12 +63,13 @@ public class BMReplicatedFailoverTest extends ReplicatedFailoverTest
          if (packet.getDataType() == ReplicationStartSyncMessage.SyncDataType.JournalMessages && (!packet.isServerToFailBack()))
          {
             testInstance.doSendCommit();
-            testInstance.waitAction();
+            testInstance.setRepNodeId(packet.getNodeID());
+            testInstance.waitForReturn();
          }
       }
    }
 
-   private void waitAction()
+   private void waitForReturn()
    {
       try
       {
@@ -76,6 +78,19 @@ public class BMReplicatedFailoverTest extends ReplicatedFailoverTest
       catch (InterruptedException e)
       {
          e.printStackTrace();
+      }
+   }
+
+   private void setRepNodeId(String nid)
+   {
+      this.repNodeId = nid;
+   }
+
+   public static void doConsumerAck(String nodeID)
+   {
+      if (nodeID.equals(testInstance.repNodeId))
+      {
+         testInstance.receiveAckLatch.countDown();
       }
    }
 
@@ -118,7 +133,15 @@ public class BMReplicatedFailoverTest extends ReplicatedFailoverTest
                      targetMethod = "handleStartReplicationSynchronization",
                      targetLocation = "AT EXIT",
                      action = "org.hornetq.byteman.tests.BMReplicatedFailoverTest.checkReplicationPacket($1)"
-                  )
+                  ),
+               @BMRule
+               (
+                      name = "consumer ack control",
+                      targetClass = "org.hornetq.core.replication.ReplicationEndpoint",
+                      targetMethod = "finishSynchronization",
+                      targetLocation = "AT EXIT",
+                      action = "org.hornetq.byteman.tests.BMReplicatedFailoverTest.doConsumerAck($1)"
+               )
             }
       )
    public void testReplicationLineupTimeout() throws Exception
@@ -192,11 +215,6 @@ public class BMReplicatedFailoverTest extends ReplicatedFailoverTest
       sendCommitLatch.countDown();
    }
 
-   private void doConsumerAck()
-   {
-      receiveAckLatch.countDown();
-   }
-
    private void waitForConsumerAckSignal()
    {
       try
@@ -267,8 +285,9 @@ public class BMReplicatedFailoverTest extends ReplicatedFailoverTest
                   }
                   finally
                   {
-                     //let consumer to start receiving
-                     doConsumerAck();
+                     //if it goes here it means the bug is fixed.
+                     //release the latch in case it still blocks the byteman rule call
+                     actionEndLatch.countDown();
                   }
                }
                catch (Throwable e)
@@ -344,9 +363,6 @@ public class BMReplicatedFailoverTest extends ReplicatedFailoverTest
                   //commit
                   receiveSession.commit();
 
-                  //if it goes here it means the bug is fixed.
-                  //release the latch in case it still blocks the byteman rule call
-                  actionEndLatch.countDown();
                   ClientMessage m = consumer.receive(5000);
                   if (m != null && errorMessage == null)
                   {
