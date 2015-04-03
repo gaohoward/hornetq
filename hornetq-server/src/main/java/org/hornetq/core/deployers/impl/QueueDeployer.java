@@ -71,7 +71,8 @@ public class QueueDeployer extends XmlDeployer
                          SimpleString.toSimpleString(queueConfig.getName()),
                          SimpleString.toSimpleString(queueConfig.getFilterString()),
                          queueConfig.isDurable(),
-                         false);
+                         false,
+                         queueConfig.isStarvationAware());
    }
 
    @Override

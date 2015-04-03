@@ -485,6 +485,11 @@
                         <xsd:documentation>whether the queue is durable (persistent)</xsd:documentation>
                       </xsd:annotation>
                     </xsd:element>
+                    <xsd:element name="starvationAware" type="xsd:boolean" default="false" maxOccurs="1" minOccurs="0">
+                      <xsd:annotation>
+                        <xsd:documentation>whether the queue can handle starvation</xsd:documentation>
+                      </xsd:annotation>
+                    </xsd:element>
                   </xsd:all>
                   <xsd:attribute name="name" type="xsd:ID" use="required">
                       <xsd:annotation>

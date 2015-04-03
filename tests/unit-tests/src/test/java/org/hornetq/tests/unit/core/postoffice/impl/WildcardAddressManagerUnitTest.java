@@ -27,6 +27,7 @@ import org.hornetq.core.server.Bindable;
 import org.hornetq.core.server.Queue;
 import org.hornetq.core.server.RoutingContext;
 import org.hornetq.core.server.ServerMessage;
+import org.hornetq.core.server.cluster.impl.Redistributor;
 import org.hornetq.tests.util.UnitTestCase;
 import org.junit.Test;
 
@@ -226,7 +227,7 @@ public class WildcardAddressManagerUnitTest extends UnitTestCase
       }
 
       @Override
-      public boolean redistribute(ServerMessage message, Queue originatingQueue, RoutingContext context) throws Exception
+      public boolean redistribute(ServerMessage message, Queue originatingQueue, RoutingContext context, Redistributor redistributor) throws Exception
       {
          return false;
       }

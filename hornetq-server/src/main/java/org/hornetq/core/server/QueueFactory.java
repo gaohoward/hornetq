@@ -36,7 +36,8 @@ public interface QueueFactory
                      Filter filter,
                      PageSubscription pageSubscription,
                      boolean durable,
-                     boolean temporary);
+                     boolean temporary,
+                     boolean starvationAware);
 
    /**
     * This is required for delete-all-reference to work correctly with paging

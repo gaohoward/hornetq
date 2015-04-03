@@ -115,7 +115,7 @@ public class BindingsImplTest extends UnitTestCase
          }
          else
          {
-            bind.redistribute(new ServerMessageImpl(i, 100), queue, new RoutingContextImpl(new FakeTransaction()));
+            bind.redistribute(new ServerMessageImpl(i, 100), queue, new RoutingContextImpl(new FakeTransaction()), null);
          }
       }
    }

@@ -74,6 +74,7 @@ public class QueueTest extends UnitTestCase
                                              null,
                                              null,
                                              false,
+                                             false,
                                              false);
 
       FakeConsumer consumer = new FakeConsumer();

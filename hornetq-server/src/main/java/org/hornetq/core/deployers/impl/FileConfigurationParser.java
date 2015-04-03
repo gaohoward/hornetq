@@ -902,6 +902,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil
       String address = null;
       String filterString = null;
       boolean durable = true;
+      boolean starvationAware = false;
 
       NodeList children = node.getChildNodes();
 
@@ -921,9 +922,13 @@ public final class FileConfigurationParser extends XMLConfigurationUtil
          {
             durable = XMLUtil.parseBoolean(child);
          }
+         else if (child.getNodeName().equals("starvationAware"))
+         {
+            starvationAware = XMLUtil.parseBoolean(child);
+         }
       }
 
-      return new CoreQueueConfiguration(address, name, filterString, durable);
+      return new CoreQueueConfiguration(address, name, filterString, durable, starvationAware);
    }
 
    private TransportConfiguration parseTransportConfiguration(final Element e, final Configuration mainConfig)

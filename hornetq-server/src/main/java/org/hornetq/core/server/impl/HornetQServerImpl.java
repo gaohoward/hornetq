@@ -1114,7 +1114,7 @@ public class HornetQServerImpl implements HornetQServer
                             final boolean durable,
                             final boolean temporary) throws Exception
    {
-      return createQueue(address, queueName, filterString, durable, temporary, false);
+      return createQueue(address, queueName, filterString, durable, temporary, false, false);
    }
 
    public Queue locateQueue(SimpleString queueName) throws Exception
@@ -1144,7 +1144,19 @@ public class HornetQServerImpl implements HornetQServer
    {
       HornetQServerLogger.LOGGER.deployQueue(queueName);
 
-      return createQueue(address, queueName, filterString, durable, temporary, true);
+      return createQueue(address, queueName, filterString, durable, temporary, true, false);
+   }
+
+   public Queue deployQueue(final SimpleString address,
+                            final SimpleString queueName,
+                            final SimpleString filterString,
+                            final boolean durable,
+                            final boolean temporary,
+                            final boolean starvationAware) throws Exception
+   {
+      HornetQServerLogger.LOGGER.deployQueue(queueName);
+
+      return createQueue(address, queueName, filterString, durable, temporary, true, starvationAware);
    }
 
    public void destroyQueue(final SimpleString queueName) throws Exception
@@ -1683,7 +1695,8 @@ public class HornetQServerImpl implements HornetQServer
                      SimpleString.toSimpleString(config.getName()),
                      SimpleString.toSimpleString(config.getFilterString()),
                      config.isDurable(),
-                     false);
+                     false,
+                     config.isStarvationAware());
       }
    }
 
@@ -1756,6 +1769,7 @@ public class HornetQServerImpl implements HornetQServer
                                                 filter,
                                                 subscription,
                                                 true,
+                                                false,
                                                 false);
 
          Binding binding = new LocalQueueBinding(queueBindingInfo.getAddress(), queue, nodeManager.getNodeId());
@@ -2031,7 +2045,8 @@ public class HornetQServerImpl implements HornetQServer
                              final SimpleString filterString,
                              final boolean durable,
                              final boolean temporary,
-                             final boolean ignoreIfExists) throws Exception
+                             final boolean ignoreIfExists,
+                             final boolean starvationAware) throws Exception
    {
       QueueBinding binding = (QueueBinding)postOffice.getBinding(queueName);
 
@@ -2071,7 +2086,8 @@ public class HornetQServerImpl implements HornetQServer
                                                    filter,
                                                    pageSubscription,
                                                    durable,
-                                                   temporary);
+                                                   temporary,
+                                                   starvationAware);
 
       binding = new LocalQueueBinding(address, queue, nodeManager.getNodeId());
 

@@ -18,6 +18,7 @@ import java.util.Collection;
 import org.hornetq.core.server.Queue;
 import org.hornetq.core.server.RoutingContext;
 import org.hornetq.core.server.ServerMessage;
+import org.hornetq.core.server.cluster.impl.Redistributor;
 import org.hornetq.core.server.group.UnproposalListener;
 
 /**
@@ -37,7 +38,7 @@ public interface Bindings extends UnproposalListener
 
    void setRouteWhenNoConsumers(boolean takePriorityIntoAccount);
 
-   boolean redistribute(ServerMessage message, Queue originatingQueue, RoutingContext context) throws Exception;
+   boolean redistribute(ServerMessage message, Queue originatingQueue, RoutingContext context, Redistributor redistributor) throws Exception;
 
    void route(ServerMessage message, RoutingContext context) throws Exception;
 }

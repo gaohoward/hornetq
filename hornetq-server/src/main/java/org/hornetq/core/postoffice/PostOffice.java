@@ -20,6 +20,7 @@ import org.hornetq.core.server.MessageReference;
 import org.hornetq.core.server.Queue;
 import org.hornetq.core.server.RoutingContext;
 import org.hornetq.core.server.ServerMessage;
+import org.hornetq.core.server.cluster.impl.Redistributor;
 import org.hornetq.core.transaction.Transaction;
 
 /**
@@ -73,7 +74,7 @@ public interface PostOffice extends HornetQComponent
 
    MessageReference reroute(ServerMessage message, Queue queue, Transaction tx) throws Exception;
 
-   Pair<RoutingContext, ServerMessage> redistribute(ServerMessage message, final Queue originatingQueue, Transaction tx) throws Exception;
+   Pair<RoutingContext, ServerMessage> redistribute(ServerMessage message, final Queue originatingQueue, Transaction tx, Redistributor redistributor) throws Exception;
 
    void processRoute(final ServerMessage message, final RoutingContext context, final boolean direct) throws Exception;
 

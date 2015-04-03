@@ -179,6 +179,13 @@ public interface HornetQServer extends HornetQComponent
                      boolean durable,
                      boolean temporary) throws Exception;
 
+   Queue deployQueue(SimpleString address,
+                     SimpleString queueName,
+                     SimpleString filterString,
+                     boolean durable,
+                     boolean temporary,
+                     boolean starvationAware) throws Exception;
+
    Queue locateQueue(SimpleString queueName) throws Exception;
 
    void destroyQueue(SimpleString queueName) throws Exception;

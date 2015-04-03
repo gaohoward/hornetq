@@ -34,6 +34,7 @@ import org.hornetq.core.server.HornetQServerLogger;
 import org.hornetq.core.server.Queue;
 import org.hornetq.core.server.RoutingContext;
 import org.hornetq.core.server.ServerMessage;
+import org.hornetq.core.server.cluster.impl.Redistributor;
 import org.hornetq.core.server.group.GroupingHandler;
 import org.hornetq.core.server.group.impl.Proposal;
 import org.hornetq.core.server.group.impl.Response;
@@ -164,7 +165,7 @@ public final class BindingsImpl implements Bindings
       }
    }
 
-   public boolean redistribute(final ServerMessage message, final Queue originatingQueue, final RoutingContext context) throws Exception
+   public boolean redistribute(final ServerMessage message, final Queue originatingQueue, final RoutingContext context, final Redistributor redistributor) throws Exception
    {
 
       if (routeWhenNoConsumers)
@@ -205,6 +206,15 @@ public final class BindingsImpl implements Bindings
          try
          {
             binding = bindings.get(pos);
+            if ((redistributor != null) && (!redistributor.accept(binding)))
+            {
+               pos = incrementPos(pos, length);
+               if (pos == startPos)
+               {
+                  break;
+               }
+               continue;
+            }
          }
          catch (IndexOutOfBoundsException e)
          {

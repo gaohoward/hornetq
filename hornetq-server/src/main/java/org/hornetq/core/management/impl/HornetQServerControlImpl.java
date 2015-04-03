@@ -644,6 +644,22 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       }
    }
 
+   public void deployQueue(final String address, final String name, final String filterStr, final boolean durable, final boolean starvationAware) throws Exception
+   {
+      checkStarted();
+
+      SimpleString filter = filterStr == null ? null : new SimpleString(filterStr);
+      clearIO();
+      try
+      {
+         server.deployQueue(new SimpleString(address), new SimpleString(name), filter, durable, false, starvationAware);
+      }
+      finally
+      {
+         blockOnIO();
+      }
+   }
+
    public void createQueue(final String address, final String name) throws Exception
    {
       checkStarted();

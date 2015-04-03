@@ -31,12 +31,20 @@ public class CoreQueueConfiguration implements Serializable
 
    private boolean durable;
 
+   private boolean starvationAware;
+
    public CoreQueueConfiguration(final String address, final String name, final String filterString, final boolean durable)
+   {
+      this(address, name, filterString, durable, false);
+   }
+
+   public CoreQueueConfiguration(final String address, final String name, final String filterString, final boolean durable, boolean starvationAware)
    {
       this.address = address;
       this.name = name;
       this.filterString = filterString;
       this.durable = durable;
+      this.starvationAware = starvationAware;
    }
 
    public String getAddress()
@@ -57,6 +65,11 @@ public class CoreQueueConfiguration implements Serializable
    public boolean isDurable()
    {
       return durable;
+   }
+
+   public boolean isStarvationAware()
+   {
+      return starvationAware;
    }
 
    /**
@@ -91,6 +104,11 @@ public class CoreQueueConfiguration implements Serializable
       this.durable = durable;
    }
 
+   public void setStarvationAware(final boolean starvationAware)
+   {
+      this.starvationAware = starvationAware;
+   }
+
    @Override
    public int hashCode()
    {
@@ -98,6 +116,7 @@ public class CoreQueueConfiguration implements Serializable
       int result = 1;
       result = prime * result + ((address == null) ? 0 : address.hashCode());
       result = prime * result + (durable ? 1231 : 1237);
+      result = prime * result + (starvationAware ? 1231 : 1237);
       result = prime * result + ((filterString == null) ? 0 : filterString.hashCode());
       result = prime * result + ((name == null) ? 0 : name.hashCode());
       return result;
@@ -121,6 +140,8 @@ public class CoreQueueConfiguration implements Serializable
       else if (!address.equals(other.address))
          return false;
       if (durable != other.durable)
+         return false;
+      if (starvationAware != other.starvationAware)
          return false;
       if (filterString == null)
       {

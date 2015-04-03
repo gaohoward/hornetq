@@ -15,16 +15,21 @@ package org.hornetq.tests.integration.cluster.distribution;
 
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.Message;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.client.ClientConsumer;
 import org.hornetq.api.core.client.ClientMessage;
 import org.hornetq.api.core.client.ClientProducer;
 import org.hornetq.api.core.client.ClientSession;
+import org.hornetq.api.core.client.MessageHandler;
 import org.hornetq.core.message.impl.MessageImpl;
 import org.hornetq.core.server.Bindable;
 import org.hornetq.core.server.cluster.impl.Redistributor;
@@ -1056,6 +1061,556 @@ public class MessageRedistributionTest extends ClusterTestBase
       session1.close();
    }
 
+   @Test
+   public void testStarvationOnOneOfTwoNodes() throws Exception
+   {
+      setupCluster(false);
+
+      startServers(0, 1);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+
+      createStarvationAwareQueue(0, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue0", null, true);
+
+      waitForBindings(0, "queues.testaddress", 1, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 0, true);
+      waitForBindings(1, "queues.testaddress", 1, 0, false);
+      waitForBindings(1, "queues.testaddress", 1, 0, true);
+
+      ClientSession session0 = addClientSession(sfs[0].createSession(true, true, 0));
+      ClientSession session1 = addClientSession(sfs[1].createSession(true, true, 0));
+
+      int num = 80;
+      final CountDownLatch latch = new CountDownLatch(num);
+      //consumer0 : 1 msg/sec
+      FixedRateConsumer slowConsumer = createFixedRateConsumer(session0, "queue0", 1000, latch);
+      //consumer1 : 20 msg/sec
+      FixedRateConsumer fastConsumer = createFixedRateConsumer(session1, "queue0", 50L, latch);
+
+      waitForBindings(0, "queues.testaddress", 1, 1, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+      waitForBindings(1, "queues.testaddress", 1, 1, false);
+      waitForBindings(1, "queues.testaddress", 1, 1, true);
+
+      //sending 80 messages
+      this.send(0, "queues.testaddress", num, false, null);
+
+      boolean result = latch.await(30, TimeUnit.SECONDS);
+
+      System.out.println("slow consumer got: " + slowConsumer.getMessageCount());
+      System.out.println("fast consumer got: " + fastConsumer.getMessageCount());
+      assertTrue(num + " messages should be all received within 10 sec, but: " + latch.getCount(), result);
+
+      assertTrue(fastConsumer.getMessageCount() > slowConsumer.getMessageCount());
+      session0.commit();
+      session1.commit();
+      //make sure queue is empty
+      ClientSession.QueueQuery query0 = session0.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query1 = session1.queueQuery(new SimpleString("queue0"));
+      assertEquals(query0.getMessageCount(), 0);
+      assertEquals(query1.getMessageCount(), 0);
+
+      session0.close();
+      session1.close();
+
+      MessageRedistributionTest.log.info("Test done");
+   }
+
+   @Test
+   public void testStarvationOnOneOfTwoNodesLazyNodeStart() throws Exception
+   {
+      setupCluster(false);
+
+      startServers(0, 1);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+
+      createStarvationAwareQueue(0, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue0", null, true);
+
+      waitForBindings(0, "queues.testaddress", 1, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 0, true);
+      waitForBindings(1, "queues.testaddress", 1, 0, false);
+      waitForBindings(1, "queues.testaddress", 1, 0, true);
+
+      ClientSession session0 = addClientSession(sfs[0].createSession(true, true, 0));
+
+      int num = 80;
+      final CountDownLatch latch = new CountDownLatch(num);
+      //consumer0 : 1 msg/sec
+      FixedRateConsumer slowConsumer = createFixedRateConsumer(session0, "queue0", 1000, latch);
+
+      waitForBindings(0, "queues.testaddress", 1, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+
+      sfs[1].close();
+      sfs[1] = null;
+      servers[1].stop();
+
+      //sending 80 messages
+      this.send(0, "queues.testaddress", num, false, null);
+
+      Thread.sleep(2000L);
+
+      startServers(1);
+
+      waitForBindings(0, "queues.testaddress", 1, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+      waitForBindings(1, "queues.testaddress", 1, 1, false);
+      waitForBindings(1, "queues.testaddress", 1, 0, true);
+
+      setupSessionFactory(1, isNetty());
+      ClientSession session1 = addClientSession(sfs[1].createSession(true, true, 0));
+      //consumer1 : 20 msg/sec
+      FixedRateConsumer fastConsumer = createFixedRateConsumer(session1, "queue0", 50L, latch);
+
+      waitForBindings(0, "queues.testaddress", 1, 1, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+      waitForBindings(1, "queues.testaddress", 1, 1, false);
+      waitForBindings(1, "queues.testaddress", 1, 1, true);
+
+      boolean result = latch.await(30, TimeUnit.SECONDS);
+
+      System.out.println("slow consumer got: " + slowConsumer.getMessageCount());
+      System.out.println("fast consumer got: " + fastConsumer.getMessageCount());
+      assertTrue(num + " messages should be all received within 10 sec, but: " + latch.getCount(), result);
+
+      assertTrue(fastConsumer.getMessageCount() > slowConsumer.getMessageCount());
+      session0.commit();
+      session1.commit();
+      //make sure queue is empty
+      ClientSession.QueueQuery query0 = session0.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query1 = session1.queueQuery(new SimpleString("queue0"));
+      assertEquals(query0.getMessageCount(), 0);
+      assertEquals(query1.getMessageCount(), 0);
+
+      session0.close();
+      session1.close();
+
+      MessageRedistributionTest.log.info("Test done");
+   }
+
+   @Test
+   public void testStarvationOnOneOfThreeNodes() throws Exception
+   {
+      setupCluster(false);
+
+      startServers(0, 1, 2);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+      setupSessionFactory(2, isNetty());
+
+      createStarvationAwareQueue(0, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(2, "queues.testaddress", "queue0", null, true);
+
+      waitForBindings(0, "queues.testaddress", 2, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 0, true);
+      waitForBindings(1, "queues.testaddress", 2, 0, false);
+      waitForBindings(1, "queues.testaddress", 1, 0, true);
+      waitForBindings(2, "queues.testaddress", 2, 0, false);
+      waitForBindings(2, "queues.testaddress", 1, 0, true);
+
+      ClientSession session0 = addClientSession(sfs[0].createSession(true, true, 0));
+      ClientSession session1 = addClientSession(sfs[1].createSession(true, true, 0));
+      ClientSession session2 = addClientSession(sfs[2].createSession(true, true, 0));
+
+      int num = 120;
+      final CountDownLatch latch = new CountDownLatch(num);
+      //consumer0 : 1 msg/sec
+      FixedRateConsumer slowConsumer = createFixedRateConsumer(session0, "queue0", 1000, latch);
+      //consumer1 : 20 msg/sec
+      FixedRateConsumer fastConsumer1 = createFixedRateConsumer(session1, "queue0", 50L, latch);
+      //consumer3 : 20 msg/sec
+      FixedRateConsumer fastConsumer2 = createFixedRateConsumer(session2, "queue0", 50L, latch);
+
+      waitForBindings(0, "queues.testaddress", 2, 2, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+      waitForBindings(1, "queues.testaddress", 2, 2, false);
+      waitForBindings(1, "queues.testaddress", 1, 1, true);
+      waitForBindings(2, "queues.testaddress", 2, 2, false);
+      waitForBindings(2, "queues.testaddress", 1, 1, true);
+
+      //sending messages
+      this.send(0, "queues.testaddress", num, false, null);
+
+      boolean result = latch.await(60, TimeUnit.SECONDS);
+
+      System.out.println("slow consumer got: " + slowConsumer.getMessageCount());
+      System.out.println("fast consumer1 got: " + fastConsumer1.getMessageCount());
+      System.out.println("fast consumer2 got: " + fastConsumer2.getMessageCount());
+      assertTrue(num + " messages should be all received within 60 sec, but: " + latch.getCount(), result);
+
+      assertTrue((fastConsumer1.getMessageCount() + fastConsumer2.getMessageCount()) / 2 > slowConsumer.getMessageCount());
+      session0.commit();
+      session1.commit();
+      session2.commit();
+
+      //make sure queue is empty
+      ClientSession.QueueQuery query0 = session0.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query1 = session1.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query2 = session2.queueQuery(new SimpleString("queue0"));
+      assertEquals(query0.getMessageCount(), 0);
+      assertEquals(query1.getMessageCount(), 0);
+      assertEquals(query2.getMessageCount(), 0);
+
+      session0.close();
+      session1.close();
+      session2.close();
+
+      MessageRedistributionTest.log.info("Test done");
+   }
+
+   @Test
+   public void testStarvationOnTwoOfThreeNodes() throws Exception
+   {
+      setupCluster(false);
+
+      startServers(0, 1, 2);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+      setupSessionFactory(2, isNetty());
+
+      createStarvationAwareQueue(0, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(2, "queues.testaddress", "queue0", null, true);
+
+      waitForBindings(0, "queues.testaddress", 2, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 0, true);
+      waitForBindings(1, "queues.testaddress", 2, 0, false);
+      waitForBindings(1, "queues.testaddress", 1, 0, true);
+      waitForBindings(2, "queues.testaddress", 2, 0, false);
+      waitForBindings(2, "queues.testaddress", 1, 0, true);
+
+      ClientSession session0 = addClientSession(sfs[0].createSession(true, true, 0));
+      ClientSession session1 = addClientSession(sfs[1].createSession(true, true, 0));
+      ClientSession session2 = addClientSession(sfs[2].createSession(true, true, 0));
+
+      int num = 120;
+      final CountDownLatch latch = new CountDownLatch(num);
+      //consumer0 : 1 msg/sec
+      FixedRateConsumer slowConsumer0 = createFixedRateConsumer(session0, "queue0", 1000L, latch);
+      //consumer1 : 20 msg/sec
+      FixedRateConsumer slowConsumer1 = createFixedRateConsumer(session1, "queue0", 1000L, latch);
+      //consumer3 : 20 msg/sec
+      FixedRateConsumer fastConsumer2 = createFixedRateConsumer(session2, "queue0", 50L, latch);
+
+      waitForBindings(0, "queues.testaddress", 2, 2, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+      waitForBindings(1, "queues.testaddress", 2, 2, false);
+      waitForBindings(1, "queues.testaddress", 1, 1, true);
+      waitForBindings(2, "queues.testaddress", 2, 2, false);
+      waitForBindings(2, "queues.testaddress", 1, 1, true);
+
+      //sending messages
+      this.send(0, "queues.testaddress", num, false, null);
+
+      boolean result = latch.await(60, TimeUnit.SECONDS);
+
+      System.out.println("slow consumer0 got: " + slowConsumer0.getMessageCount());
+      System.out.println("slow consumer1 got: " + slowConsumer1.getMessageCount());
+      System.out.println("fast consumer2 got: " + fastConsumer2.getMessageCount());
+      assertTrue(num + " messages should be all received within 60 sec, but: " + latch.getCount(), result);
+
+      assertTrue((slowConsumer0.getMessageCount() + slowConsumer1.getMessageCount()) / 2 < fastConsumer2.getMessageCount());
+
+      session0.commit();
+      session1.commit();
+      session2.commit();
+
+      //make sure queue is empty
+      ClientSession.QueueQuery query0 = session0.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query1 = session1.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query2 = session2.queueQuery(new SimpleString("queue0"));
+      assertEquals(query0.getMessageCount(), 0);
+      assertEquals(query1.getMessageCount(), 0);
+      assertEquals(query2.getMessageCount(), 0);
+
+      session0.close();
+      session1.close();
+      session2.close();
+
+      MessageRedistributionTest.log.info("Test done");
+   }
+
+   @Test
+   //one slow, one fast and one starvation unaware queue
+   public void testStarvationWithNormalQueue() throws Exception
+   {
+      setupCluster(false);
+
+      startServers(0, 1, 2);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+      setupSessionFactory(2, isNetty());
+
+      createStarvationAwareQueue(0, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue0", null, true);
+      createStarvationUnawareQueue(2, "queues.testaddress", "queue0", null, true);
+
+      waitForBindings(0, "queues.testaddress", 2, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 0, true);
+      waitForBindings(1, "queues.testaddress", 2, 0, false);
+      waitForBindings(1, "queues.testaddress", 1, 0, true);
+      waitForBindings(2, "queues.testaddress", 2, 0, false);
+      waitForBindings(2, "queues.testaddress", 1, 0, true);
+
+      ClientSession session0 = addClientSession(sfs[0].createSession(true, true, 0));
+      ClientSession session1 = addClientSession(sfs[1].createSession(true, true, 0));
+      ClientSession session2 = addClientSession(sfs[2].createSession(true, true, 0));
+
+      int num = 120;
+      final CountDownLatch latch = new CountDownLatch(num);
+      //consumer0 : 1 msg/sec
+      FixedRateConsumer slowConsumer0 = createFixedRateConsumer(session0, "queue0", 1000L, latch);
+      //consumer1 : 20 msg/sec
+      FixedRateConsumer fastConsumer1 = createFixedRateConsumer(session1, "queue0", 50L, latch);
+      //consumer3 : fast but starvation unaware
+      FixedRateConsumer fastConsumer2 = createFixedRateConsumer(session2, "queue0", 10L, latch);
+
+      waitForBindings(0, "queues.testaddress", 2, 2, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+      waitForBindings(1, "queues.testaddress", 2, 2, false);
+      waitForBindings(1, "queues.testaddress", 1, 1, true);
+      waitForBindings(2, "queues.testaddress", 2, 2, false);
+      waitForBindings(2, "queues.testaddress", 1, 1, true);
+
+      //sending messages
+      this.send(0, "queues.testaddress", num, false, null);
+
+      boolean result = latch.await(60, TimeUnit.SECONDS);
+
+      System.out.println("slow consumer0 got: " + slowConsumer0.getMessageCount());
+      System.out.println("slow consumer1 got: " + fastConsumer1.getMessageCount());
+      System.out.println("fast consumer2 got: " + fastConsumer2.getMessageCount());
+      assertTrue(num + " messages should be all received within 60 sec, but: " + latch.getCount(), result);
+
+      assertTrue(slowConsumer0.getMessageCount() < fastConsumer2.getMessageCount());
+      assertEquals(40, fastConsumer2.getMessageCount());
+
+      session0.commit();
+      session1.commit();
+      session2.commit();
+
+      //make sure queue is empty
+      ClientSession.QueueQuery query0 = session0.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query1 = session1.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query2 = session2.queueQuery(new SimpleString("queue0"));
+      assertEquals(query0.getMessageCount(), 0);
+      assertEquals(query1.getMessageCount(), 0);
+      assertEquals(query2.getMessageCount(), 0);
+
+      session0.close();
+      session1.close();
+      session2.close();
+
+      MessageRedistributionTest.log.info("Test done");
+   }
+
+   @Test
+   //two set of queues
+   public void testStarvationWithDifferentQueues() throws Exception
+   {
+      setupCluster(false);
+
+      startServers(0, 1, 2);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+      setupSessionFactory(2, isNetty());
+
+      createStarvationAwareQueue(0, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(0, "queues.testaddress", "queue1", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue1", null, true);
+      createStarvationAwareQueue(2, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(2, "queues.testaddress", "queue1", null, true);
+
+      waitForBindings(0, "queues.testaddress", 4, 0, false);
+      waitForBindings(0, "queues.testaddress", 2, 0, true);
+      waitForBindings(1, "queues.testaddress", 4, 0, false);
+      waitForBindings(1, "queues.testaddress", 2, 0, true);
+      waitForBindings(2, "queues.testaddress", 4, 0, false);
+      waitForBindings(2, "queues.testaddress", 2, 0, true);
+
+      ClientSession session0 = addClientSession(sfs[0].createSession(true, true, 0));
+      ClientSession session1 = addClientSession(sfs[1].createSession(true, true, 0));
+      ClientSession session2 = addClientSession(sfs[2].createSession(true, true, 0));
+
+      int num = 120;
+      final CountDownLatch latch = new CountDownLatch(num * 2);
+
+      FixedRateConsumer slowConsumer00 = createFixedRateConsumer(session0, "queue0", 1000L, latch);
+      FixedRateConsumer fastConsumer01 = createFixedRateConsumer(session0, "queue1", 50L, latch);
+
+      FixedRateConsumer fastConsumer10 = createFixedRateConsumer(session1, "queue0", 50L, latch);
+      FixedRateConsumer slowConsumer11 = createFixedRateConsumer(session1, "queue1", 1000L, latch);
+
+      FixedRateConsumer fastConsumer20 = createFixedRateConsumer(session2, "queue0", 10L, latch);
+
+      waitForBindings(0, "queues.testaddress", 4, 3, false);
+      waitForBindings(0, "queues.testaddress", 2, 2, true);
+      waitForBindings(1, "queues.testaddress", 4, 3, false);
+      waitForBindings(1, "queues.testaddress", 2, 2, true);
+      waitForBindings(2, "queues.testaddress", 4, 4, false);
+      waitForBindings(2, "queues.testaddress", 2, 1, true);
+
+      //sending messages
+      this.send(0, "queues.testaddress", num, false, null);
+
+      boolean result = latch.await(240, TimeUnit.SECONDS);
+
+      System.out.println("slow consumer00 got: " + slowConsumer00.getMessageCount());
+      System.out.println("fast consumer10 got: " + fastConsumer10.getMessageCount());
+      System.out.println("fast consumer20 got: " + fastConsumer20.getMessageCount());
+
+      assertEquals(num, slowConsumer00.getMessageCount() + fastConsumer10.getMessageCount() + fastConsumer20.getMessageCount());
+      System.out.println("fast consumer01 got: " + fastConsumer01.getMessageCount());
+      System.out.println("slow consumer11 got: " + slowConsumer11.getMessageCount());
+
+      assertEquals(num, fastConsumer01.getMessageCount() + slowConsumer11.getMessageCount());
+      System.out.println("latch count: " + latch.getCount() + " result: " + result);
+      assertTrue(num * 2 + " messages should be all received within 60 sec, but: " + latch.getCount(), result);
+
+      assertTrue(slowConsumer11.getMessageCount() < fastConsumer01.getMessageCount());
+      assertTrue((fastConsumer10.getMessageCount() + fastConsumer20.getMessageCount()) / 2 > slowConsumer00.getMessageCount());
+
+      session0.commit();
+      session1.commit();
+      session2.commit();
+
+      //make sure queue is empty
+      ClientSession.QueueQuery query0 = session0.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query1 = session1.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query2 = session2.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query3 = session0.queueQuery(new SimpleString("queue1"));
+      ClientSession.QueueQuery query4 = session1.queueQuery(new SimpleString("queue1"));
+      assertEquals(query0.getMessageCount(), 0);
+      assertEquals(query1.getMessageCount(), 0);
+      assertEquals(query2.getMessageCount(), 0);
+      assertEquals(query3.getMessageCount(), 0);
+      assertEquals(query4.getMessageCount(), 0);
+
+      session0.close();
+      session1.close();
+      session2.close();
+
+      MessageRedistributionTest.log.info("Test done");
+   }
+
+   @Test
+   //fast consumer has a filter so message won't get redistributed
+   public void testStarvationWithFilters() throws Exception
+   {
+      setupCluster(false);
+
+      startServers(0, 1, 2);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+      setupSessionFactory(2, isNetty());
+
+      String filter = "color='red'";
+      createStarvationAwareQueue(0, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(2, "queues.testaddress", "queue0", filter, true);
+
+      waitForBindings(0, "queues.testaddress", 2, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 0, true);
+      waitForBindings(1, "queues.testaddress", 2, 0, false);
+      waitForBindings(1, "queues.testaddress", 1, 0, true);
+      waitForBindings(2, "queues.testaddress", 2, 0, false);
+      waitForBindings(2, "queues.testaddress", 1, 0, true);
+
+      ClientSession session0 = addClientSession(sfs[0].createSession(true, true, 0));
+      ClientSession session1 = addClientSession(sfs[1].createSession(true, true, 0));
+      ClientSession session2 = addClientSession(sfs[2].createSession(true, true, 0));
+
+      int num = 30;
+      final CountDownLatch latch = new CountDownLatch(num);
+      //consumer0 : 1 msg/sec
+      FixedRateConsumer slowConsumer0 = createFixedRateConsumer(session0, "queue0", 1000L, latch);
+      //consumer1 : 1 msg/sec
+      FixedRateConsumer slowConsumer1 = createFixedRateConsumer(session1, "queue0", 1000L, latch);
+      //consumer3 : 20 msg/sec
+      FixedRateConsumer fastConsumer2 = createFixedRateConsumer(session2, "queue0", 50L, latch);
+
+      waitForBindings(0, "queues.testaddress", 2, 2, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+      waitForBindings(1, "queues.testaddress", 2, 2, false);
+      waitForBindings(1, "queues.testaddress", 1, 1, true);
+      waitForBindings(2, "queues.testaddress", 2, 2, false);
+      waitForBindings(2, "queues.testaddress", 1, 1, true);
+
+      //sending messages
+      this.send(0, "queues.testaddress", num, false, null);
+
+      boolean result = latch.await(60, TimeUnit.SECONDS);
+
+      System.out.println("slow consumer0 got: " + slowConsumer0.getMessageCount());
+      System.out.println("slow consumer1 got: " + slowConsumer1.getMessageCount());
+      System.out.println("fast consumer2 got: " + fastConsumer2.getMessageCount());
+      assertTrue(num + " messages should be all received within 60 sec, but: " + latch.getCount(), result);
+
+      //fast consumer don't get any because it has a filter.
+      assertEquals(0, fastConsumer2.getMessageCount());
+      assertEquals(num / 2, slowConsumer0.getMessageCount());
+      assertEquals(num / 2, slowConsumer1.getMessageCount());
+
+      session0.commit();
+      session1.commit();
+      session2.commit();
+
+      //make sure queue is empty
+      ClientSession.QueueQuery query0 = session0.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query1 = session1.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query2 = session2.queueQuery(new SimpleString("queue0"));
+      assertEquals(query0.getMessageCount(), 0);
+      assertEquals(query1.getMessageCount(), 0);
+      assertEquals(query2.getMessageCount(), 0);
+
+      session0.close();
+      session1.close();
+      session2.close();
+
+      MessageRedistributionTest.log.info("Test done");
+   }
+
+   private FixedRateConsumer createFixedRateConsumer(ClientSession session, String queueName,
+         long rate, CountDownLatch latch) throws HornetQException
+   {
+      ClientConsumer coreConsumer = addClientConsumer(session.createConsumer(queueName, null, 0, -1, false));
+
+      session.start();
+
+      FixedRateConsumer consumer = new FixedRateConsumer(latch, rate);
+
+      coreConsumer.setMessageHandler(consumer);
+
+      return consumer;
+   }
+
+   private void createStarvationAwareQueue(int node, String address,
+         String name, String filter, boolean durable) throws Exception
+   {
+      SimpleString filterVal = filter == null ? null : new SimpleString(filter);
+      QueueImpl queue = (QueueImpl)servers[node].createQueue(new SimpleString(address), new SimpleString(name), filterVal, durable, false);
+      queue.enableStarvationNotification();
+   }
+
+   private void createStarvationUnawareQueue(int node, String address,
+                                           String name, String filter, boolean durable) throws Exception
+   {
+      SimpleString filterVal = filter == null ? null : new SimpleString(filter);
+      QueueImpl queue = (QueueImpl)servers[node].createQueue(new SimpleString(address), new SimpleString(name), filterVal, durable, false);
+   }
+
    protected void setupCluster(final boolean forwardWhenNoConsumers) throws Exception
    {
       setupClusterConnection("cluster0", "queues", forwardWhenNoConsumers, 1, isNetty(), 0, 1, 2);
@@ -1095,4 +1650,43 @@ public class MessageRedistributionTest extends ClusterTestBase
       clearServer(0, 1, 2);
    }
 
+   private static class FixedRateConsumer implements MessageHandler
+   {
+      private CountDownLatch latch;
+      private long msPerMsg;
+      private int count = 0;
+
+      public FixedRateConsumer(CountDownLatch latch, long msPerMsg)
+      {
+         this.latch = latch;
+         this.msPerMsg = msPerMsg;
+      }
+
+      @Override
+      public void onMessage(ClientMessage message)
+      {
+         try
+         {
+            try
+            {
+               message.acknowledge();
+               count++;
+            }
+            catch (HornetQException e)
+            {
+               System.err.println("failed to ack message, count won't be correct.");
+            }
+            Thread.sleep(msPerMsg);
+         }
+         catch (InterruptedException e)
+         {
+         }
+         latch.countDown();
+      }
+
+      public int getMessageCount()
+      {
+         return count;
+      }
+   }
 }

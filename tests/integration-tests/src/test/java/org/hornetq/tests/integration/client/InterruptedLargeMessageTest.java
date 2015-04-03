@@ -562,7 +562,8 @@ public class InterruptedLargeMessageTest extends LargeMessageTestBase
                                   Filter filter,
                                   PageSubscription pageSubscription,
                                   boolean durable,
-                                  boolean temporary)
+                                  boolean temporary,
+                                  boolean starvationAware)
          {
 
             return new NoPostACKQueue(persistenceID,

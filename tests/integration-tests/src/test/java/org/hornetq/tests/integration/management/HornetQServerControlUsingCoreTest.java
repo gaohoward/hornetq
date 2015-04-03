@@ -154,6 +154,12 @@ public class HornetQServerControlUsingCoreTest extends HornetQServerControlTest
             proxy.invokeOperation("deployQueue", address, name);
          }
 
+         @Override
+         public void deployQueue(@Parameter(name = "address", desc = "Address of the queue") String address, @Parameter(name = "name", desc = "Name of the queue") String name, @Parameter(name = "filter", desc = "Filter of the queue") String filter, @Parameter(name = "durable", desc = "Is the queue durable?") boolean durable, @Parameter(name = "starvationAware", desc = "Is the queue able to handle starvation?") boolean starvationAware) throws Exception
+         {
+            proxy.invokeOperation("deployQueue", address, name, filter, durable, starvationAware);
+         }
+
          public void destroyQueue(final String name) throws Exception
          {
             proxy.invokeOperation("destroyQueue", name);

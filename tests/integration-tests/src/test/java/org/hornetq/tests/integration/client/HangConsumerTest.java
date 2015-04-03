@@ -285,7 +285,8 @@ public class HangConsumerTest extends ServiceTestBase
                                   final Filter filter,
                                   final PageSubscription pageSubscription,
                                   final boolean durable,
-                                  final boolean temporary)
+                                  final boolean temporary,
+                                  final boolean starvationAware)
          {
             queue = new MyQueueWithBlocking(persistenceID,
                                             address,

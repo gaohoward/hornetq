@@ -22,6 +22,7 @@ import org.hornetq.api.core.Pair;
 import org.hornetq.core.filter.Filter;
 import org.hornetq.core.journal.IOAsyncTask;
 import org.hornetq.core.persistence.StorageManager;
+import org.hornetq.core.postoffice.Binding;
 import org.hornetq.core.postoffice.PostOffice;
 import org.hornetq.core.server.Consumer;
 import org.hornetq.core.server.HandleStatus;
@@ -32,7 +33,6 @@ import org.hornetq.core.server.RoutingContext;
 import org.hornetq.core.server.ServerMessage;
 import org.hornetq.core.transaction.Transaction;
 import org.hornetq.core.transaction.impl.TransactionImpl;
-import org.hornetq.utils.ReusableLatch;
 
 /**
  * A Redistributor
@@ -43,24 +43,19 @@ import org.hornetq.utils.ReusableLatch;
  */
 public class Redistributor implements Consumer
 {
-   private boolean active;
+   protected boolean active;
 
-   private final StorageManager storageManager;
+   protected final StorageManager storageManager;
 
-   private final PostOffice postOffice;
+   protected final PostOffice postOffice;
 
-   private final Executor executor;
+   protected final Executor executor;
 
    private final int batchSize;
 
-   private final Queue queue;
+   protected final Queue queue;
 
-   private int count;
-
-   // a Flush executor here is happening inside another executor.
-   // what may cause issues under load. Say you are running out of executors for cases where you don't need to wait at all.
-   // So, instead of using a future we will use a plain ReusableLatch here
-   private ReusableLatch pendingRuns = new ReusableLatch();
+   int count;
 
    public Redistributor(final Queue queue,
                         final StorageManager storageManager,
@@ -99,42 +94,14 @@ public class Redistributor implements Consumer
       active = true;
    }
 
-   public synchronized void stop() throws Exception
+   public synchronized void stop()
    {
       active = false;
-
-      boolean ok = flushExecutor();
-
-      if (!ok)
-      {
-         HornetQServerLogger.LOGGER.errorStoppingRedistributor();
-      }
    }
 
    public synchronized void close()
    {
-      boolean ok = flushExecutor();
-
-      if (!ok)
-      {
-         throw new IllegalStateException("Timed out waiting for executor to complete");
-      }
-
       active = false;
-   }
-
-   private boolean flushExecutor()
-   {
-      try
-      {
-         boolean ok = pendingRuns.await(10000);
-         return ok;
-      }
-      catch (InterruptedException e)
-      {
-         HornetQServerLogger.LOGGER.warn(e.getMessage(), e);
-         return false;
-      }
    }
 
    public synchronized HandleStatus handle(final MessageReference reference) throws Exception
@@ -151,7 +118,7 @@ public class Redistributor implements Consumer
 
       final Transaction tx = new TransactionImpl(storageManager);
 
-      final Pair<RoutingContext, ServerMessage> routingInfo = postOffice.redistribute(reference.getMessage(), queue, tx);
+      final Pair<RoutingContext, ServerMessage> routingInfo = postOffice.redistribute(reference.getMessage(), queue, tx, this);
 
       if (routingInfo == null)
       {
@@ -216,28 +183,7 @@ public class Redistributor implements Consumer
       // no op
    }
 
-
-   private void internalExecute(final Runnable runnable)
-   {
-      pendingRuns.countUp();
-      executor.execute(new Runnable()
-      {
-         public void run()
-         {
-            try
-            {
-               runnable.run();
-            }
-            finally
-            {
-               pendingRuns.countDown();
-            }
-         }
-      });
-   }
-
-
-   private void ackRedistribution(final MessageReference reference, final Transaction tx) throws Exception
+   protected void ackRedistribution(final MessageReference reference, final Transaction tx) throws Exception
    {
       reference.handled();
 
@@ -299,6 +245,11 @@ public class Redistributor implements Consumer
    public List<MessageReference> getDeliveringMessages()
    {
       return Collections.emptyList();
+   }
+
+   public boolean accept(Binding binding)
+   {
+      return true;
    }
 
 }

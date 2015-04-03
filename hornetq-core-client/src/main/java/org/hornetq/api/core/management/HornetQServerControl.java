@@ -380,6 +380,24 @@ public interface HornetQServerControl
     * @param filter  of the queue
     * @param durable whether the queue is durable
     */
+
+   @Operation(desc = "Deploy a queue", impact = MBeanOperationInfo.ACTION)
+   void deployQueue(@Parameter(name = "address", desc = "Address of the queue") String address,
+                    @Parameter(name = "name", desc = "Name of the queue") String name,
+                    @Parameter(name = "filter", desc = "Filter of the queue") String filter,
+                    @Parameter(name = "durable", desc = "Is the queue durable?") boolean durable,
+                    @Parameter(name = "starvationAware", desc = "Is the queue able to handle starvation?") boolean starvationAware) throws Exception;
+
+   /**
+    * Deploy a queue.
+    * <br>
+    * This method will do nothing if the queue with the given name already exists on the server.
+    *
+    * @param address address to bind the queue to
+    * @param name    name of the queue
+    * @param filter  of the queue
+    * @param durable whether the queue is durable
+    */
    @Operation(desc = "Deploy a queue", impact = MBeanOperationInfo.ACTION)
    void deployQueue(@Parameter(name = "address", desc = "Address of the queue") String address,
                     @Parameter(name = "name", desc = "Name of the queue") String name,

@@ -66,13 +66,15 @@ public class QueueFactoryImpl implements QueueFactory
       this.postOffice = postOffice;
    }
 
+   @Override
    public Queue createQueue(final long persistenceID,
                             final SimpleString address,
                             final SimpleString name,
                             final Filter filter,
                             final PageSubscription pageSubscription,
                             final boolean durable,
-                            final boolean temporary)
+                            final boolean temporary,
+                            final boolean starvationAware)
    {
       AddressSettings addressSettings = addressSettingsRepository.getMatch(address.toString());
 
@@ -105,7 +107,8 @@ public class QueueFactoryImpl implements QueueFactory
                                postOffice,
                                storageManager,
                                addressSettingsRepository,
-                               executorFactory.getExecutor());
+                               executorFactory.getExecutor(),
+                               starvationAware);
       }
 
       return queue;

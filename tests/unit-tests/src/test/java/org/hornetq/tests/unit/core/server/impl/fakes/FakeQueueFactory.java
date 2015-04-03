@@ -46,7 +46,8 @@ public class FakeQueueFactory implements QueueFactory
                             final Filter filter,
                             final PageSubscription subscription,
                             final boolean durable,
-                            final boolean temporary)
+                            final boolean temporary,
+                            final boolean starvationAware)
    {
       return new QueueImpl(persistenceID,
                            address,
@@ -59,7 +60,8 @@ public class FakeQueueFactory implements QueueFactory
                            postOffice,
                            null,
                            null,
-                           executor);
+                           executor,
+                           starvationAware);
    }
 
    public void setPostOffice(final PostOffice postOffice)

@@ -44,6 +44,7 @@ import org.hornetq.core.filter.Filter;
 import org.hornetq.core.paging.cursor.PageSubscription;
 import org.hornetq.core.paging.cursor.PagedReference;
 import org.hornetq.core.persistence.StorageManager;
+import org.hornetq.core.postoffice.Binding;
 import org.hornetq.core.postoffice.Bindings;
 import org.hornetq.core.postoffice.DuplicateIDCache;
 import org.hornetq.core.postoffice.PostOffice;
@@ -59,6 +60,7 @@ import org.hornetq.core.server.RoutingContext;
 import org.hornetq.core.server.ScheduledDeliveryHandler;
 import org.hornetq.core.server.ServerMessage;
 import org.hornetq.core.server.cluster.impl.Redistributor;
+import org.hornetq.core.server.cluster.impl.StarvingRedistributor;
 import org.hornetq.core.server.management.ManagementService;
 import org.hornetq.core.server.management.Notification;
 import org.hornetq.core.settings.HierarchicalRepository;
@@ -219,6 +221,17 @@ public class QueueImpl implements Queue
     */
    private final Object directDeliveryGuard = new Object();
 
+   private boolean starvationNotificationEnabled;
+
+   private AtomicLong starvationPoints;
+
+   //starvation duration (seconds) after which a notification
+   //will be sent out, default 2.
+   private long starvationTimeout = 2;
+
+   //key is Binding's ID
+   private StarvingRedistributor starvingRedistributor;
+
    /**
     * For testing only
     * */
@@ -316,7 +329,8 @@ public class QueueImpl implements Queue
            postOffice,
            storageManager,
            addressSettingsRepository,
-           executor);
+           executor,
+           false);
    }
 
    public QueueImpl(final long id,
@@ -331,6 +345,35 @@ public class QueueImpl implements Queue
                     final StorageManager storageManager,
                     final HierarchicalRepository<AddressSettings> addressSettingsRepository,
                     final Executor executor)
+   {
+      this(id,
+           address,
+           name,
+           filter,
+           pageSubscription,
+           durable,
+           temporary,
+           scheduledExecutor,
+           postOffice,
+           storageManager,
+           addressSettingsRepository,
+           executor,
+           false);
+   }
+
+   public QueueImpl(final long id,
+                    final SimpleString address,
+                    final SimpleString name,
+                    final Filter filter,
+                    final PageSubscription pageSubscription,
+                    final boolean durable,
+                    final boolean temporary,
+                    final ScheduledExecutorService scheduledExecutor,
+                    final PostOffice postOffice,
+                    final StorageManager storageManager,
+                    final HierarchicalRepository<AddressSettings> addressSettingsRepository,
+                    final Executor executor,
+                    final boolean starvationAware)
    {
       this.id = id;
 
@@ -377,6 +420,8 @@ public class QueueImpl implements Queue
       }
 
       this.executor = executor;
+
+      this.starvationNotificationEnabled = starvationAware;
 
    }
 
@@ -649,6 +694,7 @@ public class QueueImpl implements Queue
             try
             {
                cancelRedistributor();
+               cancelStarvationRedistributors();
             }
             catch (Exception e)
             {
@@ -840,6 +886,7 @@ public class QueueImpl implements Queue
       }
 
       cancelRedistributor();
+      cancelStarvationRedistributors();
 
       super.finalize();
    }
@@ -1915,6 +1962,8 @@ public class QueueImpl implements Queue
 
       long timeout = System.currentTimeMillis() + DELIVERY_TIMEOUT;
 
+      int lastPos = -1;
+
       while (true)
       {
          if (handled == MAX_DELIVERIES_IN_LOOP)
@@ -1955,6 +2004,7 @@ public class QueueImpl implements Queue
 
             if (messageReferences.size() == 0)
             {
+               starvationAlert();
                break;
             }
 
@@ -2131,6 +2181,56 @@ public class QueueImpl implements Queue
       return queueMemorySize.get() < pageSubscription.getPagingStore().getMaxSize();
    }
 
+   //This method is called when the queue finds its messageReferences list is empty
+   //It decides whether to initiate starvation check
+   private void starvationAlert()
+   {
+      if (!(starvationNotificationEnabled && starvationPoints.get() == -1))
+      {
+         return;
+      }
+
+      starvationPoints.set(0);
+
+      boolean onStarvation = false;
+
+      if (!consumerSet.isEmpty())
+      {
+         if (pageIterator != null)
+         {
+            if (!pageIterator.hasNext())
+            {
+               onStarvation = true;
+            }
+         }
+         else
+         {
+            onStarvation = true;
+         }
+      }
+
+      if (onStarvation)
+      {
+         //this queue is on starvation so no point to
+         //give messages to others
+         cancelStarvationRedistributors();
+         this.scheduledExecutor.execute(new StarvationMonitor());
+      }
+      else
+      {
+         this.starvationPoints.set(-1);
+      }
+   }
+
+   public synchronized void enableStarvationNotification()
+   {
+      if (!starvationNotificationEnabled)
+      {
+         starvationNotificationEnabled = true;
+         this.starvationPoints = new AtomicLong(-1);
+      }
+   }
+
    private SimpleString extractGroupID(MessageReference ref)
    {
       if (internalQueue)
@@ -2250,6 +2350,7 @@ public class QueueImpl implements Queue
       // create the redistributor only once if there are no local consumers
       if (consumerSet.isEmpty() && redistributor == null)
       {
+         cancelStarvationRedistributors();
          redistributor = new Redistributor(this,
                                            storageManager,
                                            postOffice,
@@ -2263,6 +2364,18 @@ public class QueueImpl implements Queue
          redistributor.start();
 
          deliverAsync();
+      }
+   }
+
+   private synchronized void cancelStarvationRedistributors()
+   {
+      if (starvationNotificationEnabled && starvingRedistributor != null)
+      {
+         starvingRedistributor.stop();
+         StarvingRedistributor redistributorToRemove = starvingRedistributor;
+         starvingRedistributor = null;
+
+         removeConsumer(redistributorToRemove);
       }
    }
 
@@ -2717,7 +2830,7 @@ public class QueueImpl implements Queue
    // Inner classes
    // --------------------------------------------------------------------------
 
-   private static class ConsumerHolder
+   public static class ConsumerHolder
    {
       ConsumerHolder(final Consumer consumer)
       {
@@ -3132,6 +3245,43 @@ public class QueueImpl implements Queue
       }
    }
 
+   //just a 'loose' check on queue's messages and local consumers
+   private boolean inStarvation()
+   {
+      if (consumerSet.isEmpty())
+      {
+         return false;
+      }
+
+      long mcount = messageReferences.size() + this.intermediateMessageReferences.size();
+      if (pageSubscription != null)
+      {
+         mcount += pageSubscription.getMessageCount();
+      }
+      return mcount == 0;
+   }
+
+   private void notifyStarvation()
+   {
+      TypedProperties props = new TypedProperties();
+      Binding thisLocalBinding = postOffice.getBinding(this.name);
+      props.putSimpleStringProperty(ManagementHelper.HDR_CLUSTER_NAME, thisLocalBinding.getClusterName());
+
+      props.putSimpleStringProperty(ManagementHelper.HDR_ADDRESS, this.address);
+      props.putIntProperty(ManagementHelper.HDR_DISTANCE, 0);
+
+      Notification notification = new Notification(null, CoreNotificationType.STARVATION, props);
+      ManagementService managementService = ((PostOfficeImpl)postOffice).getManagementService();
+      try
+      {
+         managementService.sendNotification(notification);
+      }
+      catch (Exception e)
+      {
+         HornetQServerLogger.LOGGER.error("failed to send starvation notification", e);
+      }
+   }
+
    private class AddressSettingsRepositoryListener implements HierarchicalRepositoryChangeListener
    {
       @Override
@@ -3236,6 +3386,58 @@ public class QueueImpl implements Queue
                }
             }
          }
+      }
+   }
+
+   //Periodically checks whether the queue is in starvation
+   //state and sends out notification if needed.
+   private class StarvationMonitor implements Runnable
+   {
+      @Override
+      public void run()
+      {
+         if (inStarvation())
+         {
+            if (starvationPoints.incrementAndGet() >= starvationTimeout)
+            {
+               // sending notification
+               notifyStarvation();
+               starvationPoints.set(-1);
+            }
+            else
+            {
+               QueueImpl.this.scheduledExecutor.schedule(this, 1000, TimeUnit.MILLISECONDS);
+            }
+         }
+         else
+         {
+            starvationPoints.set(-1);
+         }
+      }
+   }
+
+   public void addStarvation(Binding remoteBinding)
+   {
+      if ( !this.starvationNotificationEnabled ) return;
+
+      synchronized (this)
+      {
+         //we don't add it if there is a redistributor.
+         if (this.redistributor != null) return;
+         if (this.starvingRedistributor == null)
+         {
+            this.starvingRedistributor =  new StarvingRedistributor(this, storageManager, postOffice,
+                    executor, QueueImpl.REDISTRIBUTOR_BATCH_SIZE);
+            ConsumerHolder holder = new ConsumerHolder(starvingRedistributor);
+
+            consumerList.add(holder);
+            consumersChanged = true;
+            this.starvingRedistributor.start();
+
+            deliverAsync();
+         }
+
+         this.starvingRedistributor.resetQuota(remoteBinding);
       }
    }
 }

@@ -25,6 +25,7 @@ import org.hornetq.core.server.MessageReference;
 import org.hornetq.core.server.Queue;
 import org.hornetq.core.server.RoutingContext;
 import org.hornetq.core.server.ServerMessage;
+import org.hornetq.core.server.cluster.impl.Redistributor;
 import org.hornetq.core.server.impl.MessageReferenceImpl;
 import org.hornetq.core.transaction.Transaction;
 
@@ -124,7 +125,7 @@ public class FakePostOffice implements PostOffice
 
    }
 
-   public Pair<RoutingContext, ServerMessage> redistribute(final ServerMessage message, final Queue originatingQueue, final Transaction tx) throws Exception
+   public Pair<RoutingContext, ServerMessage> redistribute(final ServerMessage message, final Queue originatingQueue, final Transaction tx, Redistributor redistributor) throws Exception
    {
       return null;
    }
@@ -185,5 +186,4 @@ public class FakePostOffice implements PostOffice
 
 
    }
-
 }

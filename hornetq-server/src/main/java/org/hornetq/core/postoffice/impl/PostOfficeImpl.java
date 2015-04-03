@@ -62,6 +62,7 @@ import org.hornetq.core.server.QueueFactory;
 import org.hornetq.core.server.RouteContextList;
 import org.hornetq.core.server.RoutingContext;
 import org.hornetq.core.server.ServerMessage;
+import org.hornetq.core.server.cluster.impl.Redistributor;
 import org.hornetq.core.server.group.GroupingHandler;
 import org.hornetq.core.server.impl.RoutingContextImpl;
 import org.hornetq.core.server.impl.ServerMessageImpl;
@@ -800,7 +801,8 @@ public class PostOfficeImpl implements PostOffice, NotificationListener, Binding
    /**
     * The redistribution can't process the route right away as we may be dealing with a large message which will need to be processed on a different thread
     */
-   public Pair<RoutingContext, ServerMessage> redistribute(final ServerMessage message, final Queue originatingQueue, final Transaction tx) throws Exception
+   @Override
+   public Pair<RoutingContext, ServerMessage> redistribute(final ServerMessage message, final Queue originatingQueue, final Transaction tx, final Redistributor redistributor) throws Exception
    {
 
       // We have to copy the message and store it separately, otherwise we may lose remote bindings in case of restart before the message
@@ -814,7 +816,7 @@ public class PostOfficeImpl implements PostOffice, NotificationListener, Binding
       {
          RoutingContext context = new RoutingContextImpl(tx);
 
-         boolean routed = bindings.redistribute(copyRedistribute, originatingQueue, context);
+         boolean routed = bindings.redistribute(copyRedistribute, originatingQueue, context, redistributor);
 
          if (routed)
          {
@@ -1494,6 +1496,11 @@ public class PostOfficeImpl implements PostOffice, NotificationListener, Binding
          groupingHandler.addListener(bindings);
       }
       return bindings;
+   }
+
+   public ManagementService getManagementService()
+   {
+      return this.managementService;
    }
 
    // For tests only

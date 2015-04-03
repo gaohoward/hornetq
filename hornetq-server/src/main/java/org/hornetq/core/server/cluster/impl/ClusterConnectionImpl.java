@@ -47,6 +47,7 @@ import org.hornetq.core.client.impl.TopologyMemberImpl;
 import org.hornetq.core.postoffice.Binding;
 import org.hornetq.core.postoffice.Bindings;
 import org.hornetq.core.postoffice.PostOffice;
+import org.hornetq.core.postoffice.impl.LocalQueueBinding;
 import org.hornetq.core.postoffice.impl.PostOfficeImpl;
 import org.hornetq.core.protocol.core.impl.wireformat.NodeAnnounceMessage;
 import org.hornetq.core.server.HornetQMessageBundle;
@@ -62,6 +63,7 @@ import org.hornetq.core.server.cluster.MessageFlowRecord;
 import org.hornetq.core.server.cluster.RemoteQueueBinding;
 import org.hornetq.core.server.group.impl.Proposal;
 import org.hornetq.core.server.group.impl.Response;
+import org.hornetq.core.server.impl.QueueImpl;
 import org.hornetq.core.server.management.ManagementService;
 import org.hornetq.core.server.management.Notification;
 import org.hornetq.spi.core.protocol.RemotingConnection;
@@ -1325,9 +1327,33 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
                doUnProposalReceived(message);
                break;
             }
+            case STARVATION:
+            {
+               doStarvationReceived(message);
+               break;
+            }
             default:
             {
                throw HornetQMessageBundle.BUNDLE.invalidType(ntype);
+            }
+         }
+      }
+
+      private void doStarvationReceived(final ClientMessage message)
+      {
+         SimpleString bindingName = message.getSimpleStringProperty(ManagementHelper.HDR_CLUSTER_NAME);
+
+         Binding remoteBinding = postOffice.getBinding(bindingName);
+
+         if (remoteBinding != null)
+         {
+            SimpleString routingName = remoteBinding.getRoutingName();
+            Binding localBinding = postOffice.getBinding(routingName);
+
+            if (localBinding != null)
+            {
+               QueueImpl queue = (QueueImpl) ((LocalQueueBinding)localBinding).getQueue();
+               queue.addStarvation(remoteBinding);
             }
          }
       }
