@@ -40,4 +40,5 @@ public interface QueueBindingInfo
 
    SimpleString getFilterString();
 
+   boolean isStarvationAware();
 }

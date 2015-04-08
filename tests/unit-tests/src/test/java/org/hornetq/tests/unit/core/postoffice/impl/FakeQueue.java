@@ -566,4 +566,10 @@ public class FakeQueue implements Queue
    {
       return 0.0f;
    }
+
+   @Override
+   public boolean isStarvationAware()
+   {
+      return false;
+   }
 }

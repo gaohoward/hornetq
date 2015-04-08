@@ -1770,7 +1770,7 @@ public class HornetQServerImpl implements HornetQServer
                                                 subscription,
                                                 true,
                                                 false,
-                                                false);
+                                                queueBindingInfo.isStarvationAware());
 
          Binding binding = new LocalQueueBinding(queueBindingInfo.getAddress(), queue, nodeManager.getNodeId());
 
@@ -2040,7 +2040,7 @@ public class HornetQServerImpl implements HornetQServer
       }
    }
 
-   private Queue createQueue(final SimpleString address,
+   public Queue createQueue(final SimpleString address,
                              final SimpleString queueName,
                              final SimpleString filterString,
                              final boolean durable,

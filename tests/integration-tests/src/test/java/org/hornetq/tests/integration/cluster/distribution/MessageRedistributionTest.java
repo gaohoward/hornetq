@@ -1600,15 +1600,14 @@ public class MessageRedistributionTest extends ClusterTestBase
          String name, String filter, boolean durable) throws Exception
    {
       SimpleString filterVal = filter == null ? null : new SimpleString(filter);
-      QueueImpl queue = (QueueImpl)servers[node].createQueue(new SimpleString(address), new SimpleString(name), filterVal, durable, false);
-      queue.enableStarvationNotification();
+      servers[node].createQueue(new SimpleString(address), new SimpleString(name), filterVal, durable, false, false, true);
    }
 
    private void createStarvationUnawareQueue(int node, String address,
                                            String name, String filter, boolean durable) throws Exception
    {
       SimpleString filterVal = filter == null ? null : new SimpleString(filter);
-      QueueImpl queue = (QueueImpl)servers[node].createQueue(new SimpleString(address), new SimpleString(name), filterVal, durable, false);
+      servers[node].createQueue(new SimpleString(address), new SimpleString(name), filterVal, durable, false);
    }
 
    protected void setupCluster(final boolean forwardWhenNoConsumers) throws Exception

@@ -2090,7 +2090,8 @@ public class JournalStorageManager implements StorageManager
 
       PersistentQueueBindingEncoding bindingEncoding = new PersistentQueueBindingEncoding(queue.getName(),
                                                                                           binding.getAddress(),
-                                                                                          filterString);
+                                                                                          filterString,
+                                                                                          queue.isStarvationAware());
 
       readLock();
       try
@@ -3136,6 +3137,8 @@ public class JournalStorageManager implements StorageManager
 
       public SimpleString filterString;
 
+      public boolean starvationAware;
+
       public PersistentQueueBindingEncoding()
       {
       }
@@ -3150,16 +3153,20 @@ public class JournalStorageManager implements StorageManager
             address +
             ", filterString=" +
             filterString +
+            ", starvationAware=" +
+            starvationAware +
             "]";
       }
 
       public PersistentQueueBindingEncoding(final SimpleString name,
                                             final SimpleString address,
-                                            final SimpleString filterString)
+                                            final SimpleString filterString,
+                                            final boolean starvationAware)
       {
          this.name = name;
          this.address = address;
          this.filterString = filterString;
+         this.starvationAware = starvationAware;
       }
 
       public long getId()
@@ -3192,11 +3199,17 @@ public class JournalStorageManager implements StorageManager
          return name;
       }
 
+      public boolean isStarvationAware()
+      {
+         return this.starvationAware;
+      }
+
       public void decode(final HornetQBuffer buffer)
       {
          name = buffer.readSimpleString();
          address = buffer.readSimpleString();
          filterString = buffer.readNullableSimpleString();
+         starvationAware = buffer.readBoolean();
       }
 
       public void encode(final HornetQBuffer buffer)
@@ -3204,12 +3217,13 @@ public class JournalStorageManager implements StorageManager
          buffer.writeSimpleString(name);
          buffer.writeSimpleString(address);
          buffer.writeNullableSimpleString(filterString);
+         buffer.writeBoolean(starvationAware);
       }
 
       public int getEncodeSize()
       {
          return SimpleString.sizeofString(name) + SimpleString.sizeofString(address) +
-            SimpleString.sizeofNullableString(filterString);
+            SimpleString.sizeofNullableString(filterString) + DataConstants.SIZE_BOOLEAN;
       }
    }
 

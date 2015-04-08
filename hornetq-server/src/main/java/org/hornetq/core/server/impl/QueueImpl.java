@@ -221,7 +221,7 @@ public class QueueImpl implements Queue
     */
    private final Object directDeliveryGuard = new Object();
 
-   private boolean starvationNotificationEnabled;
+   private boolean starvationAware;
 
    private AtomicLong starvationPoints;
 
@@ -421,8 +421,11 @@ public class QueueImpl implements Queue
 
       this.executor = executor;
 
-      this.starvationNotificationEnabled = starvationAware;
-
+      this.starvationAware = starvationAware;
+      if (starvationAware)
+      {
+         this.starvationPoints = new AtomicLong(-1);
+      }
    }
 
    // Bindable implementation -------------------------------------------------------------------------------------
@@ -2185,7 +2188,7 @@ public class QueueImpl implements Queue
    //It decides whether to initiate starvation check
    private void starvationAlert()
    {
-      if (!(starvationNotificationEnabled && starvationPoints.get() == -1))
+      if (!(starvationAware && starvationPoints.get() == -1))
       {
          return;
       }
@@ -2224,11 +2227,17 @@ public class QueueImpl implements Queue
 
    public synchronized void enableStarvationNotification()
    {
-      if (!starvationNotificationEnabled)
+      if (!starvationAware)
       {
-         starvationNotificationEnabled = true;
+         starvationAware = true;
          this.starvationPoints = new AtomicLong(-1);
       }
+   }
+
+   @Override
+   public boolean isStarvationAware()
+   {
+      return this.starvationAware;
    }
 
    private SimpleString extractGroupID(MessageReference ref)
@@ -2369,7 +2378,7 @@ public class QueueImpl implements Queue
 
    private synchronized void cancelStarvationRedistributors()
    {
-      if (starvationNotificationEnabled && starvingRedistributor != null)
+      if (starvationAware && starvingRedistributor != null)
       {
          starvingRedistributor.stop();
          StarvingRedistributor redistributorToRemove = starvingRedistributor;
@@ -3418,7 +3427,7 @@ public class QueueImpl implements Queue
 
    public void addStarvation(Binding remoteBinding)
    {
-      if ( !this.starvationNotificationEnabled ) return;
+      if ( !this.starvationAware ) return;
 
       synchronized (this)
       {

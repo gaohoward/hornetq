@@ -237,4 +237,6 @@ public interface Queue extends Bindable
    void setInternalQueue(boolean internalQueue);
 
    float getRate();
+
+   boolean isStarvationAware();
 }
