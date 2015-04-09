@@ -2096,7 +2096,7 @@ public class JournalStorageManager implements StorageManager
       readLock();
       try
       {
-         bindingsJournal.appendAddRecordTransactional(tx, binding.getID(), JournalRecordIds.QUEUE_BINDING_RECORD,
+         bindingsJournal.appendAddRecordTransactional(tx, binding.getID(), JournalRecordIds.QUEUE_BINDING_RECORD1,
                                                       bindingEncoding);
       }
       finally
@@ -2248,6 +2248,12 @@ public class JournalStorageManager implements StorageManager
          if (rec == JournalRecordIds.QUEUE_BINDING_RECORD)
          {
             PersistentQueueBindingEncoding bindingEncoding = newBindingEncoding(id, buffer);
+
+            queueBindingInfos.add(bindingEncoding);
+         }
+         else if (rec == JournalRecordIds.QUEUE_BINDING_RECORD1)
+         {
+            PersistentQueueBindingEncoding bindingEncoding = newBindingEncoding1(id, buffer);
 
             queueBindingInfos.add(bindingEncoding);
          }
@@ -3139,8 +3145,16 @@ public class JournalStorageManager implements StorageManager
 
       public boolean starvationAware;
 
+      private boolean oldVersion;
+
       public PersistentQueueBindingEncoding()
       {
+         this(true);
+      }
+
+      public PersistentQueueBindingEncoding(boolean oldVersion)
+      {
+         this.oldVersion = oldVersion;
       }
 
       @Override
@@ -3209,7 +3223,11 @@ public class JournalStorageManager implements StorageManager
          name = buffer.readSimpleString();
          address = buffer.readSimpleString();
          filterString = buffer.readNullableSimpleString();
-         starvationAware = buffer.readBoolean();
+         if (!oldVersion)
+         {
+            starvationAware = buffer.readBoolean();
+         }
+
       }
 
       public void encode(final HornetQBuffer buffer)
@@ -3978,6 +3996,16 @@ public class JournalStorageManager implements StorageManager
    protected static PersistentQueueBindingEncoding newBindingEncoding(long id, HornetQBuffer buffer)
    {
       PersistentQueueBindingEncoding bindingEncoding = new PersistentQueueBindingEncoding();
+
+      bindingEncoding.decode(buffer);
+
+      bindingEncoding.setId(id);
+      return bindingEncoding;
+   }
+
+   protected static PersistentQueueBindingEncoding newBindingEncoding1(long id, HornetQBuffer buffer)
+   {
+      PersistentQueueBindingEncoding bindingEncoding = new PersistentQueueBindingEncoding(false);
 
       bindingEncoding.decode(buffer);
 

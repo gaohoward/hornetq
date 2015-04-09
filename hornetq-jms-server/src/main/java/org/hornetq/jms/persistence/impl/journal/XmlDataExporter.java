@@ -89,6 +89,7 @@ import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.ADD_MES
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.ADD_REF;
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.PAGE_TRANSACTION;
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.QUEUE_BINDING_RECORD;
+import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.QUEUE_BINDING_RECORD1;
 
 /**
  * Read the journal, page, and large-message data from a stopped instance of HornetQ and save it in an XML format to
@@ -456,7 +457,7 @@ public final class XmlDataExporter
 
       for (RecordInfo info : records)
       {
-         if (info.getUserRecordType() == QUEUE_BINDING_RECORD)
+         if (info.getUserRecordType() == QUEUE_BINDING_RECORD || info.getUserRecordType() == QUEUE_BINDING_RECORD1)
          {
             PersistentQueueBindingEncoding bindingEncoding =
                (PersistentQueueBindingEncoding)DescribeJournal.newObjectEncoding(info, null);

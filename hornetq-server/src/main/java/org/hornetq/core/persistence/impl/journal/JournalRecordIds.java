@@ -18,6 +18,7 @@ public final class JournalRecordIds
    // BindingsImpl journal record type
 
    public static final byte QUEUE_BINDING_RECORD = 21;
+   public static final byte QUEUE_BINDING_RECORD1 = 22;
 
    /**
     * Records storing the current recordID number.

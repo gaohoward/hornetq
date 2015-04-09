@@ -58,6 +58,7 @@ import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.PAGE_CU
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.PAGE_CURSOR_PENDING_COUNTER;
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.PAGE_TRANSACTION;
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.QUEUE_BINDING_RECORD;
+import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.QUEUE_BINDING_RECORD1;
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.SECURITY_RECORD;
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.SET_SCHEDULED_DELIVERY_TIME;
 import static org.hornetq.core.persistence.impl.journal.JournalRecordIds.UPDATE_DELIVERY_COUNT;
@@ -604,6 +605,9 @@ public final class DescribeJournal
 
          case QUEUE_BINDING_RECORD:
             return JournalStorageManager.newBindingEncoding(id, buffer);
+
+         case QUEUE_BINDING_RECORD1:
+            return JournalStorageManager.newBindingEncoding1(id, buffer);
 
          case ID_COUNTER_RECORD:
             EncodingSupport idReturn = new IDCounterEncoding();
