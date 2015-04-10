@@ -1668,6 +1668,94 @@ public class MessageRedistributionTest extends ClusterTestBase
       MessageRedistributionTest.log.info("Test done");
    }
 
+   @Test
+   //if fast consumer closes messages can flow back to slow ones and be consumed
+   public void testStarvationOnFastConsumerClose() throws Exception
+   {
+      setupCluster(false);
+
+      startServers(0, 1, 2);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+      setupSessionFactory(2, isNetty());
+
+      createStarvationAwareQueue(0, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(1, "queues.testaddress", "queue0", null, true);
+      createStarvationAwareQueue(2, "queues.testaddress", "queue0", null, true);
+
+      waitForBindings(0, "queues.testaddress", 2, 0, false);
+      waitForBindings(0, "queues.testaddress", 1, 0, true);
+      waitForBindings(1, "queues.testaddress", 2, 0, false);
+      waitForBindings(1, "queues.testaddress", 1, 0, true);
+      waitForBindings(2, "queues.testaddress", 2, 0, false);
+      waitForBindings(2, "queues.testaddress", 1, 0, true);
+
+      ClientSession session0 = addClientSession(sfs[0].createSession(true, true, 0));
+      ClientSession session1 = addClientSession(sfs[1].createSession(true, true, 0));
+      ClientSession session2 = addClientSession(sfs[2].createSession(true, true, 0));
+
+      int num = 120;
+      final CountDownLatch latch = new CountDownLatch(num);
+      //consumer0 : 1 msg/sec
+      FixedRateConsumer slowConsumer0 = createFixedRateConsumer(session0, "queue0", 1000L, latch, null);
+      //consumer1 : 1 msg/sec
+      FixedRateConsumer slowConsumer1 = createFixedRateConsumer(session1, "queue0", 1000L, latch, null);
+      //consumer3 : 20 msg/sec
+      FixedRateConsumer fastConsumer2 = createFixedRateConsumer(session2, "queue0", 50L, latch, null);
+
+      waitForBindings(0, "queues.testaddress", 2, 2, false);
+      waitForBindings(0, "queues.testaddress", 1, 1, true);
+      waitForBindings(1, "queues.testaddress", 2, 2, false);
+      waitForBindings(1, "queues.testaddress", 1, 1, true);
+      waitForBindings(2, "queues.testaddress", 2, 2, false);
+      waitForBindings(2, "queues.testaddress", 1, 1, true);
+
+      //sending messages
+      this.send(0, "queues.testaddress", num, false, null);
+
+      while (latch.getCount() > 40)
+      {
+         Thread.sleep(200);
+         ClientSession.QueueQuery query2 = session2.queueQuery(new SimpleString("queue0"));
+         if (query2.getMessageCount() > 20)
+         {
+            break;
+         }
+         System.out.println("Messages left in fast queue: " + query2.getMessageCount());
+      }
+
+      //close the fast consumer.
+      session2.commit();
+      session2.close();
+
+      //here make slow consumer faster to let the test finish quick
+      slowConsumer0.setRate(20);
+      slowConsumer1.setRate(20);
+
+      boolean result = latch.await(60, TimeUnit.SECONDS);
+
+      System.out.println("slow consumer0 got: " + slowConsumer0.getMessageCount());
+      System.out.println("slow consumer1 got: " + slowConsumer1.getMessageCount());
+      System.out.println("fast consumer2 got: " + fastConsumer2.getMessageCount());
+      assertTrue(num + " messages should be all received within 60 sec, but: " + latch.getCount(), result);
+
+      session0.commit();
+      session1.commit();
+
+      //make sure queue is empty
+      ClientSession.QueueQuery query0 = session0.queueQuery(new SimpleString("queue0"));
+      ClientSession.QueueQuery query1 = session1.queueQuery(new SimpleString("queue0"));
+
+      assertEquals(query0.getMessageCount(), 0);
+      assertEquals(query1.getMessageCount(), 0);
+
+      session0.close();
+      session1.close();
+
+      MessageRedistributionTest.log.info("Test done");
+   }
+
    private FixedRateConsumer createFixedRateConsumer(ClientSession session, String queueName,
          long rate, CountDownLatch latch, List<ClientMessage> received) throws HornetQException
    {
@@ -1738,7 +1826,7 @@ public class MessageRedistributionTest extends ClusterTestBase
    private static class FixedRateConsumer implements MessageHandler
    {
       private CountDownLatch latch;
-      private long msPerMsg;
+      private volatile long msPerMsg;
       private int count = 0;
       private List<ClientMessage> received = null;
 
@@ -1778,6 +1866,11 @@ public class MessageRedistributionTest extends ClusterTestBase
       public int getMessageCount()
       {
          return count;
+      }
+
+      public void setRate(long rate)
+      {
+         this.msPerMsg = rate;
       }
    }
 }
