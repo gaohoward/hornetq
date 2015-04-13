@@ -69,6 +69,7 @@
             <module>message-group</module>
             <module>message-group2</module>
             <module>message-priority</module>
+            <module>message-starvation</module>
             <module>multiple-failover</module>
             <module>multiple-failover-failback</module>
             <module>no-consumer-buffering</module>

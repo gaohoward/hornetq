@@ -1,0 +1,181 @@
+<html>
+  <head>
+    <title>HornetQ JMS Load Balanced Clustered Queue Example</title>
+    <link rel="stylesheet" type="text/css" href="../common/common.css" />
+    <link rel="stylesheet" type="text/css" href="../common/prettify.css" />
+    <script type="text/javascript" src="../common/prettify.js"></script>
+  </head>
+  <body onload="prettyPrint()">
+     <h1>JMS Load Balanced Clustered Queue Example</h1>
+
+     <p>This example demonstrates how hornetq handles message starvation on clustered queues.
+     In the example two nodes (node 0 and 1) are configured to form a cluster. A clustered queue is configured and deployed
+     that can handle message starvation situation. </p>
+     <pre class="prettyprint">
+     <code>&lt;queue name = ""jms.queue.starvationAwareQueue""&gt;
+        &lt;address&gt;jms.queue.starvationAwareQueue&lt;/address&gt;
+        &lt;starvationAware&lt;true&lt;/starvation&gt;
+     &lt;/queue&gt;
+     </code>
+     </pre>
+     For comparison, a normal clustered queue is also deployed.
+     <p>We send 20 messages to each queue so that each queue on each node will get 10 messages.</p>
+     <p>Then we create 4 consumers so that each queue gets a local consumer. For queues on node 0 the 
+     local consumers receives messages at a rate of one message per second. For queues on node1 the local
+     consumers receive messages at a rate of 25 messages per second.</p>
+     <p>The example calculates receiving time of the total messages for each clustered queue and shows that
+     messages are consumed much faster with message starvation handling capability configured than without.</p>
+
+     <p>For more information on HornetQ load balancing, and clustering in general, please see the clustering
+     section of the user manual.</p>      
+     <h2>Example step-by-step</h2>
+     <p><i>To run the example, simply type <code>mvn verify</code> from this directory</i></p>
+
+     <ol>
+        <li> Get an initial context for looking up JNDI from server 0.</li>
+        <pre class="prettyprint">
+           <code>ic0 = getContext(0);</code>
+        </pre>
+
+        <li>Look-up the JMS Queue objects from JNDI</li>
+        <pre class="prettyprint">
+           <code>Queue starvationAwareQueue = (Queue)ic0.lookup("/queue/starvationAwareQueue");</code>
+           <code>Queue normalQueue = (Queue)ic0.lookup("/queue/normalQueue");</code>
+        </pre>
+
+        <li>Look-up a JMS Connection Factory object from JNDI on server 0</li>
+        <pre class="prettyprint">
+           <code>ConnectionFactory cf0 = (ConnectionFactory)ic0.lookup("/ConnectionFactory");</code>
+        </pre>
+
+        <li>Get an initial context for looking up JNDI from server 1.</li>
+        <pre class="prettyprint">
+           <code>ic1 = getContext(1);</code>
+        </pre>
+
+        <li>Look-up a JMS Connection Factory object from JNDI on server 1</li>
+        <pre class="prettyprint">
+           <code>ConnectionFactory cf1 = (ConnectionFactory)ic1.lookup("/ConnectionFactory");
+           </code>
+        </pre>
+
+        <li>We create a JMS Connection connection0 which is a connection to server 0</li>
+        <pre class="prettyprint">
+          <code>connection0 = cf0.createConnection();</code>
+        </pre>
+        
+        <li>We create a JMS Connection connection1 which is a connection to server 1</li>
+        <pre class="prettyprint">
+          <code>connection1 = cf1.createConnection();</code>
+        </pre>
+
+        <li>We create 2 JMS Sessions on server 0</li>
+        <pre class="prettyprint">
+           <code>
+         Session session0 = connection0.createSession(false, Session.AUTO_ACKNOWLEDGE);
+         Session session1 = connection0.createSession(false, Session.AUTO_ACKNOWLEDGE);
+           </code>
+        </pre>
+        
+        <li>We create 2 JMS Session on server 1</li>
+        <pre class="prettyprint">
+           <code>
+         Session session2 = connection1.createSession(false, Session.AUTO_ACKNOWLEDGE);
+         Session session3 = connection1.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            </code>
+        </pre>
+
+        <li>We create a JMS MessageProducer object on server 0 to the normal queue
+         and create another on server 0 to the starvation aware queue.</li>
+        <pre class="prettyprint">
+           <code>
+         MessageProducer producerN = session0.createProducer(normalQueue);
+         MessageProducer producerS = session0.createProducer(starvationAwareQueue);
+           </code>
+        </pre>
+
+        <li>We send some messages to server 0 to both queues</li>
+        <pre class="prettyprint">
+           <code>
+         final int numMessages = 20;
+
+         for (int i = 0; i < numMessages; i++)
+         {
+            TextMessage message = session0.createTextMessage("This is text message " + i);
+            producerN.send(message);
+            producerS.send(message);
+         }
+           </code>
+        </pre>
+
+        <li> We use latches to count the messages to be received.</li>
+        <pre class="prettyprint">
+           <code>
+         final CountDownLatch latchN = new CountDownLatch(numMessages);
+         final CountDownLatch latchS = new CountDownLatch(numMessages);
+         final AtomicLong finishTimeN = new AtomicLong(0L);
+         final AtomicLong finishTimeS = new AtomicLong(0L);
+   </code>
+        </pre>
+
+        <li> We create JMS MessageConsumer objects on server 0 and server 1.</li>
+        <pre class="prettyprint">
+           <code>
+         MessageConsumer slowConsumerNormalQueue0 = session0.createConsumer(normalQueue);
+         slowConsumerNormalQueue0.setMessageListener(new MessageCountListener(latchN, 1000, finishTimeN));
+         MessageConsumer slowConsumerStarvationAwareQueue0 = session1.createConsumer(starvationAwareQueue);
+         slowConsumerStarvationAwareQueue0.setMessageListener(new MessageCountListener(latchS, 1000, finishTimeS));
+
+         MessageConsumer fastConsumerNormalQueue1 = session2.createConsumer(normalQueue);
+         fastConsumerNormalQueue1.setMessageListener(new MessageCountListener(latchN, 25, finishTimeN));
+         MessageConsumer fastConsumerStarvationAwareQueue1 = session3.createConsumer(starvationAwareQueue);
+         fastConsumerStarvationAwareQueue1.setMessageListener(new MessageCountListener(latchS, 25, finishTimeS));
+           </code>
+        </pre>
+        
+        <li>We start the connections to start delivery</li>
+        <pre class="prettyprint">
+           <code>
+         long beginTime = System.currentTimeMillis();
+         connection0.start();
+         connection1.start();
+           </code>
+        </pre>
+        
+        <li>We wait for the finish of the message receiving and calculate the total time.</li>
+        <pre class="prettyprint">
+			<code>
+		 latchS.await();
+         latchN.await();
+
+         while (finishTimeN.get() == 0L || finishTimeS.get() == 0L)
+         {
+            Thread.sleep(5);
+         }
+         long timeS = finishTimeS.get() - beginTime;
+         long timeN = finishTimeN.get() - beginTime;
+            </code>
+        </pre>
+
+        <li>And finally (no pun intended), <b>always</b> remember to close your JMS resources after use, in a <code>finally</code> block. Closing a JMS connection will automatically close all of its sessions, consumers, producer and browser objects</li>
+
+        <pre class="prettyprint">
+           <code>
+	finally
+	{
+	   if (connection0 != null)
+	   {
+	      connection0.close();
+	   }
+	      
+	   if (connection1 != null)
+	   {
+	      connection1.close();
+	   }
+	}
+           </code>
+        </pre>
+
+     </ol>
+  </body>
+</html>
