@@ -922,7 +922,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil
          {
             durable = XMLUtil.parseBoolean(child);
          }
-         else if (child.getNodeName().equals("starvationAware"))
+         else if (child.getNodeName().equals("starvation-aware"))
          {
             starvationAware = XMLUtil.parseBoolean(child);
          }

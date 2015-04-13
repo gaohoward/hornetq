@@ -914,6 +914,30 @@ locator.setLoadBalancingPolicyClassName("com.acme.MyLoadBalancingPolicy");</prog
             that a consumer closes but another one quickly is created on the same queue, in such a
             case you probably don't want to redistribute immediately since the new consumer will
             arrive shortly.</para>
+        <section>
+			<title>Handling Message Starvation in Clustered Queues</title>
+			<para>If each node has a consumer, then messages will be sent to each node evenly. For
+			example, if we send 100 messages to a 2-node cluster, each node will get 50 messages.
+			and each consumer will receive 50 messages from its node. If one of the consumer is 
+			very slow to process messages while the other is much faster, it creates a situation
+			where the fast consumer quickly consumes all 50 messages and the slow consumer will take
+			much longer time, during which the fast consumer has been idle.</para>
+			<para>To improve such a situation, we can configure a queue to be 'starvation aware'.</para>
+<programlisting>
+&lt;queues>
+   &lt;queue name="jms.queue.starvationAwareQueue">
+      &lt;address>jms.queue.starvationAwareQueue&lt;/address>
+      &lt;starvation-aware>true&lt;/starvation-aware>
+   &lt;/queue>
+&lt;/queues>
+</programlisting>
+			<para>If a clustered queue is configured with 'starvation-aware=true', it will send
+			a 'Starvation' redistribution request to other nodes if it finds its message buffer
+			empty for some time. Each queue on every other node that receives the signal will
+			check its message buffer and redistribute a certain amount of its messages to the
+			starving node. In that way more message will keep flowing to the nodes where there 
+			is a fast consumer and its queue is often empty.</para>
+        </section>
     </section>
     <section>
         <title>Cluster topologies</title>

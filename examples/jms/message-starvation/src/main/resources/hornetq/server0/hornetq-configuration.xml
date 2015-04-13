@@ -59,7 +59,7 @@
    <queues>
 	   <queue name="jms.queue.starvationAwareQueue">
 		   <address>jms.queue.starvationAwareQueue</address>
-		   <starvationAware>true</starvationAware>
+		   <starvation-aware>true</starvation-aware>
 	   </queue>
    </queues>
    <!-- Other config -->
