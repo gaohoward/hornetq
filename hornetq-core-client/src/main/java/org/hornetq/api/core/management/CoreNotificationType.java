@@ -39,7 +39,7 @@ public enum CoreNotificationType implements NotificationType
    PROPOSAL_RESPONSE(19),
    UNPROPOSAL(20),
    CONSUMER_SLOW(21),
-   STARVATION(22);
+   REDISTRIBUTION_REQUEST(22);
 
    private final int value;
 

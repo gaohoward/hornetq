@@ -274,7 +274,7 @@ public class ClusterConnectionBridge extends BridgeImpl
                                                 "','" +
                                                 CoreNotificationType.UNPROPOSAL +
                                                 "','" +
-                                                CoreNotificationType.STARVATION +
+                                                CoreNotificationType.REDISTRIBUTION_REQUEST +
                                                 "') AND " +
                                                 ManagementHelper.HDR_DISTANCE +
                                                 "<" +

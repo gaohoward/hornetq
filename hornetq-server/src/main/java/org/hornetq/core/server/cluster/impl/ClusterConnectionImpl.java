@@ -1327,7 +1327,7 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
                doUnProposalReceived(message);
                break;
             }
-            case STARVATION:
+            case REDISTRIBUTION_REQUEST:
             {
                doStarvationReceived(message);
                break;

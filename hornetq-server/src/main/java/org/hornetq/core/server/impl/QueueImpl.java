@@ -3279,7 +3279,7 @@ public class QueueImpl implements Queue
       props.putSimpleStringProperty(ManagementHelper.HDR_ADDRESS, this.address);
       props.putIntProperty(ManagementHelper.HDR_DISTANCE, 0);
 
-      Notification notification = new Notification(null, CoreNotificationType.STARVATION, props);
+      Notification notification = new Notification(null, CoreNotificationType.REDISTRIBUTION_REQUEST, props);
       ManagementService managementService = ((PostOfficeImpl)postOffice).getManagementService();
       try
       {

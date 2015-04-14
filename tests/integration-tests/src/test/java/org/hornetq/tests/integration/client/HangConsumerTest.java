@@ -496,7 +496,7 @@ public class HangConsumerTest extends ServiceTestBase
          int bindings = 0;
          for (RecordInfo info : infos)
          {
-            if (info.getUserRecordType() == JournalRecordIds.QUEUE_BINDING_RECORD)
+            if (info.getUserRecordType() == JournalRecordIds.QUEUE_BINDING_RECORD1)
             {
                bindings++;
             }
