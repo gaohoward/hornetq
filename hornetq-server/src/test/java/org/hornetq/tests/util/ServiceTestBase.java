@@ -92,6 +92,7 @@ public abstract class ServiceTestBase extends UnitTestCase
    @After
    public void tearDown() throws Exception
    {
+      System.out.println("#################### now tearing down #######################");
       super.tearDown();
       if (InVMRegistry.instance.size() > 0)
       {
