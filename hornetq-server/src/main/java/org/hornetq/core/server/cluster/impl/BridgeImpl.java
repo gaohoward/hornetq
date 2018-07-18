@@ -729,6 +729,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
    public void connectionFailed(final HornetQException me, boolean failedOver)
    {
+      HornetQServerLogger.LOGGER.info("bridge got failure event", true, me);
       HornetQServerLogger.LOGGER.bridgeConnectionFailed(me, failedOver);
 
       synchronized (connectionGuard)
@@ -980,6 +981,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
    /* This is called only when the bridge is activated */
    protected void connect()
    {
+      HornetQServerLogger.LOGGER.info("connecting bridge: " + csf);
       if (stopping)
          return;
 
@@ -998,9 +1000,11 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
             {
                if (stopping)
                   return;
+               HornetQServerLogger.LOGGER.info("creating a brand new csf....");
                csf = createSessionFactory();
                if (csf == null)
                {
+                  HornetQServerLogger.LOGGER.info("not successful, retrying...");
                   // Retrying. This probably means the node is not available (for the cluster connection case)
                   scheduleRetryConnect();
                   return;
@@ -1009,6 +1013,8 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
                session = (ClientSessionInternal)csf.createSession(user, password, false, true, true, true, 1);
                sessionConsumer = (ClientSessionInternal)csf.createSession(user, password, false, true, true, true, 1);
             }
+
+            HornetQServerLogger.LOGGER.info("using csf to go on: " + csf);
 
             if (forwardingAddress != null)
             {
@@ -1059,6 +1065,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
             queue.deliverAsync();
 
             HornetQServerLogger.LOGGER.bridgeConnected("" + this.getName());
+            HornetQServerLogger.LOGGER.info("ok bridge connected: " + csf);
 
             // We only do this on plain core bridges
             if (isPlainCoreBridge())

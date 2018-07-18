@@ -35,7 +35,6 @@ import org.hornetq.spi.core.remoting.Connector;
  */
 public final class Topology implements Serializable
 {
-
    private static final long serialVersionUID = -9037171688692471371L;
 
    private final Set<ClusterTopologyListener> topologyListeners = new HashSet<ClusterTopologyListener>();
@@ -187,11 +186,12 @@ public final class Topology implements Serializable
     */
    public boolean updateMember(final long uniqueEventID, final String nodeId, final TopologyMemberImpl memberInput)
    {
+      HornetQClientLogger.LOGGER.info("updating topology " + this + " eventid: " + uniqueEventID + " member: " + memberInput);
 
       Long deleteTme = getMapDelete().get(nodeId);
       if (deleteTme != null && uniqueEventID != 0 && uniqueEventID < deleteTme)
       {
-         HornetQClientLogger.LOGGER.debug("Update uniqueEvent=" + uniqueEventID +
+         HornetQClientLogger.LOGGER.info("Update uniqueEvent=" + uniqueEventID +
                    ", nodeId=" +
                    nodeId +
                    ", memberInput=" +
@@ -204,6 +204,7 @@ public final class Topology implements Serializable
       {
          TopologyMemberImpl currentMember = topology.get(nodeId);
 
+         HornetQClientLogger.LOGGER.info("current member is: " + currentMember);
          if (currentMember == null)
          {
             if (HornetQClientLogger.LOGGER.isTraceEnabled())
@@ -216,19 +217,24 @@ public final class Topology implements Serializable
             sendMemberUp(nodeId, memberInput);
             return true;
          }
+
+         HornetQClientLogger.LOGGER.info("uniqueID: " + uniqueEventID + " current id: " + currentMember.getUniqueEventID());
          if (uniqueEventID > currentMember.getUniqueEventID())
          {
+            HornetQClientLogger.LOGGER.info("is a new member");
             TopologyMemberImpl newMember =
                      new TopologyMemberImpl(nodeId, memberInput.getBackupGroupName(), memberInput.getLive(),
                                             memberInput.getBackup());
 
             if (newMember.getLive() == null && currentMember.getLive() != null)
             {
+               HornetQClientLogger.LOGGER.info("new member doesn't have live???, but current: " + currentMember.getLive());
                newMember.setLive(currentMember.getLive());
             }
 
             if (newMember.getBackup() == null && currentMember.getBackup() != null)
             {
+               HornetQClientLogger.LOGGER.info("new member doesn't have backup????, current: " + currentMember.getBackup());
                newMember.setBackup(currentMember.getBackup());
             }
 
@@ -243,6 +249,7 @@ public final class Topology implements Serializable
             newMember.setUniqueEventID(uniqueEventID);
             topology.remove(nodeId);
             topology.put(nodeId, newMember);
+            HornetQClientLogger.LOGGER.info(this + " so updated topology for node: " + nodeId + " old: " + currentMember + " new: " + newMember);
             sendMemberUp(nodeId, newMember);
 
             return true;
@@ -274,6 +281,7 @@ public final class Topology implements Serializable
 
       if (copy.size() > 0)
       {
+         HornetQClientLogger.LOGGER.info("dispatching runnable to call nodeUP... " + Topology.this);
          execute(new Runnable()
          {
             public void run()
@@ -289,6 +297,12 @@ public final class Topology implements Serializable
                                         " connector = " +
                                         memberToSend.getConnector());
                   }
+                  HornetQClientLogger.LOGGER.info(Topology.this + " informing " +
+                           listener +
+                           " about node up = " +
+                           nodeId +
+                           " connector = " +
+                           memberToSend.getConnector());
 
                   try
                   {

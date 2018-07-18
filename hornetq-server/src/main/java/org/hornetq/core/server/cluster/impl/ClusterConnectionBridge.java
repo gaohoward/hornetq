@@ -146,11 +146,21 @@ public class ClusterConnectionBridge extends BridgeImpl
          logger.trace("Setting up bridge between " + clusterConnection.getConnector() + " and " + targetLocator,
                                           new Exception("trace"));
       }
+      HornetQServerLogger.LOGGER.info("new cc bridge, targetLocator: " + targetLocator, true, null);
+   }
+
+   @Override
+   public void stop() throws Exception
+   {
+      //find out who initiate the stop
+      HornetQServerLogger.LOGGER.info("now stopping the cc bridge: " + this.serverLocator, true, null);
+      super.stop();
    }
 
    @Override
    protected ClientSessionFactoryInternal createSessionFactory() throws Exception
    {
+      HornetQServerLogger.LOGGER.info("in ccbridge createsf ... " + serverLocator);
       ClientSessionFactoryInternal factory = (ClientSessionFactoryInternal)serverLocator.createSessionFactory(targetNodeID);
       setSessionFactory(factory);
 
@@ -172,6 +182,7 @@ public class ClusterConnectionBridge extends BridgeImpl
             }
          }
       });
+      HornetQServerLogger.LOGGER.info("successfully created a factory for ccb " + factory);
       return factory;
    }
 

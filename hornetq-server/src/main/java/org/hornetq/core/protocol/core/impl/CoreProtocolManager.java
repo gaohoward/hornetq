@@ -303,6 +303,7 @@ class CoreProtocolManager implements ProtocolManager
          {
             NodeAnnounceMessage msg = (NodeAnnounceMessage)packet;
 
+            HornetQServerLogger.LOGGER.info("received a nodeAnnouncement packet, is backup? " + msg.isBackup());
             Pair<TransportConfiguration, TransportConfiguration> pair;
             if (msg.isBackup())
             {
@@ -322,6 +323,7 @@ class CoreProtocolManager implements ProtocolManager
                ClusterConnection clusterConn = acceptorUsed.getClusterConnection();
                if (clusterConn != null)
                {
+                  HornetQServerLogger.LOGGER.info("call cc.nodeAnnouned");
                   clusterConn.nodeAnnounced(msg.getCurrentEventID(), msg.getNodeID(), msg.getNodeName(), pair, msg.isBackup());
                }
                else

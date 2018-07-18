@@ -614,6 +614,7 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
                              final Pair<TransportConfiguration, TransportConfiguration> connectorPair,
                              final boolean backup)
    {
+      HornetQServerLogger.LOGGER.info("cc got node announce: " + backup + " node: " + nodeID + " pair: " + connectorPair);
       if (HornetQServerLogger.LOGGER.isDebugEnabled())
       {
          HornetQServerLogger.LOGGER.debug(this + "::NodeAnnounced, backup=" + backup + nodeID + connectorPair);
@@ -843,6 +844,7 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
    @Override
    public void nodeUP(final TopologyMember topologyMember, final boolean last)
    {
+      HornetQServerLogger.LOGGER.info("cc receive node up notif...");
       if (stopping)
       {
          return;
@@ -862,12 +864,14 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
             HornetQServerLogger.LOGGER.trace(this + "::informing about backup to itself, nodeUUID=" +
                                                 nodeManager.getNodeId() + ", connectorPair=" + topologyMember + ", this = " + this);
          }
+         HornetQServerLogger.LOGGER.info("it's this node, no processing. " + nodeID);
          return;
       }
 
       // if the node is more than 1 hop away, we do not create a bridge for direct cluster connection
       if (allowDirectConnectionsOnly && !allowableConnections.contains(topologyMember.getLive()))
       {
+         HornetQServerLogger.LOGGER.info("live node doesn't allowed to connect, ignore.... " + allowableConnections);
          return;
       }
 
@@ -885,11 +889,13 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
             HornetQServerLogger.LOGGER.trace(this + " ignoring call with nodeID=" + nodeID + ", topologyMember=" +
                                                 topologyMember + ", last=" + last);
          }
+         HornetQServerLogger.LOGGER.info("it's no live, we don't create bridge to backups, ignore..");
          return;
       }
 
       synchronized (recordsGuard)
       {
+         HornetQServerLogger.LOGGER.info("Now creating a record...");
          try
          {
             MessageFlowRecord record = records.get(nodeID);
@@ -929,11 +935,13 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
             }
             else
             {
+               HornetQServerLogger.LOGGER.info("won't create record because it's already existed for node: " + nodeID);
                if (isTrace)
                {
                   HornetQServerLogger.LOGGER.trace(this + " ignored nodeUp record for " + topologyMember + " on nodeID=" +
                                                       nodeID + " as the record already existed");
                }
+               //here we may update the record (e.g. the connector may changes to backup)
             }
          }
          catch (Exception e)

@@ -700,6 +700,7 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
 
    public ClientSessionFactory createSessionFactory(String nodeID) throws Exception
    {
+      HornetQClientLogger.LOGGER.info("creating a csf to node: " + nodeID);
       TopologyMember topologyMember = topology.getMember(nodeID);
 
       if (logger.isTraceEnabled())
@@ -707,23 +708,29 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
          logger.trace("Creating connection factory towards " + nodeID + " = " + topologyMember + ", topology=" + topology.describe());
       }
 
+      HornetQClientLogger.LOGGER.info("topology now: " + topology.describe());
+
       if (topologyMember == null)
       {
          return null;
       }
       if (topologyMember.getLive() != null)
       {
+         HornetQClientLogger.LOGGER.info("creating csf using live: " + topologyMember.getLive());
          ClientSessionFactoryInternal factory = (ClientSessionFactoryInternal)createSessionFactory(topologyMember.getLive());
          if (topologyMember.getBackup() != null)
          {
             factory.setBackupConnector(topologyMember.getLive(), topologyMember.getBackup());
          }
+         HornetQClientLogger.LOGGER.info("ok factory created using live: " + factory);
          return factory;
       }
       if (topologyMember.getLive() == null && topologyMember.getBackup() != null)
       {
+         HornetQClientLogger.LOGGER.info("live is null so using backup: " + topologyMember.getBackup());
          // This shouldn't happen, however I wanted this to consider all possible cases
          ClientSessionFactoryInternal factory = (ClientSessionFactoryInternal)createSessionFactory(topologyMember.getBackup());
+         HornetQClientLogger.LOGGER.info("ok factory created using backup: " + factory);
          return factory;
       }
       // it shouldn't happen
