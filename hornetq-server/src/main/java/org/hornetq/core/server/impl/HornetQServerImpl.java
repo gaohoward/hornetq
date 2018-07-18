@@ -533,6 +533,7 @@ public class HornetQServerImpl implements HornetQServer
             state = SERVER_STATE.STARTED;
             HornetQServerLogger.LOGGER.serverStarted(getVersion().getFullVersion(), nodeManager.getNodeId(),
                                                      identity != null ? identity : "");
+            HornetQServerLogger.LOGGER.info("server started: " + nodeManager.getNodeId() + " tostring: " + this);
          }
          // start connector service
          connectorsService = new ConnectorsService(configuration, storageManager, scheduledPool, postOffice);
@@ -2533,6 +2534,8 @@ public class HornetQServerImpl implements HornetQServer
 
             HornetQServerLogger.LOGGER.backupServerStarted(version.getFullVersion(), nodeManager.getNodeId());
 
+
+            HornetQServerLogger.LOGGER.info("backup server waiting... " + nodeManager.getNodeId() + " tostring: " + HornetQServerImpl.this);
             nodeManager.awaitLiveNode();
 
             configuration.setBackup(false);
@@ -2547,6 +2550,8 @@ public class HornetQServerImpl implements HornetQServer
             clusterManager.activate();
 
             HornetQServerLogger.LOGGER.backupServerIsLive();
+
+            HornetQServerLogger.LOGGER.info("backup server becomes live " + nodeManager.getNodeId() + " tostring: " + HornetQServerImpl.this);
 
             nodeManager.releaseBackup();
             if (configuration.isAllowAutoFailBack())

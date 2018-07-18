@@ -35,7 +35,6 @@ import org.hornetq.spi.core.remoting.Connector;
  */
 public final class Topology implements Serializable
 {
-
    private static final long serialVersionUID = -9037171688692471371L;
 
    private final Set<ClusterTopologyListener> topologyListeners = new HashSet<ClusterTopologyListener>();
@@ -187,6 +186,7 @@ public final class Topology implements Serializable
     */
    public boolean updateMember(final long uniqueEventID, final String nodeId, final TopologyMemberImpl memberInput)
    {
+      HornetQClientLogger.LOGGER.info("updating topology " + this + " eventid: " + uniqueEventID + " member: " + memberInput, true, null);
 
       Long deleteTme = getMapDelete().get(nodeId);
       if (deleteTme != null && uniqueEventID != 0 && uniqueEventID < deleteTme)
@@ -218,17 +218,20 @@ public final class Topology implements Serializable
          }
          if (uniqueEventID > currentMember.getUniqueEventID())
          {
+            HornetQClientLogger.LOGGER.info("is a new member");
             TopologyMemberImpl newMember =
                      new TopologyMemberImpl(nodeId, memberInput.getBackupGroupName(), memberInput.getLive(),
                                             memberInput.getBackup());
 
             if (newMember.getLive() == null && currentMember.getLive() != null)
             {
+               HornetQClientLogger.LOGGER.info("new member doesn't have live???, but current: " + currentMember.getLive());
                newMember.setLive(currentMember.getLive());
             }
 
             if (newMember.getBackup() == null && currentMember.getBackup() != null)
             {
+               HornetQClientLogger.LOGGER.info("new member doesn't have backup????, current: " + currentMember.getBackup());
                newMember.setBackup(currentMember.getBackup());
             }
 
@@ -243,6 +246,7 @@ public final class Topology implements Serializable
             newMember.setUniqueEventID(uniqueEventID);
             topology.remove(nodeId);
             topology.put(nodeId, newMember);
+            HornetQClientLogger.LOGGER.info(this + " so updated topology for node: " + nodeId + " old: " + currentMember + " new: " + newMember);
             sendMemberUp(nodeId, newMember);
 
             return true;

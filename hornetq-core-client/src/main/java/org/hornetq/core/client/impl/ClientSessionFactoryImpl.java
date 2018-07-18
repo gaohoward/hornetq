@@ -1493,6 +1493,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
          HornetQClientLogger.LOGGER.debug("Announcing node " + serverLocator.getNodeID() + ", isBackup=" + isBackup);
       }
       channel0.send(new NodeAnnounceMessage(currentEventID, nodeID, nodeName, isBackup, config, backupConfig));
+      HornetQClientLogger.LOGGER.info("sent out a nodeAnounce: " + nodeID + " isbackup? " + isBackup + " over ch0: " + channel0);
    }
 
    @Override
@@ -1806,6 +1807,8 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
       public synchronized void run()
       {
+         HornetQClientLogger.LOGGER.info("running pinger from cf: " + ClientSessionFactoryImpl.this.toString());
+         HornetQClientLogger.LOGGER.info("canceled? " + cancelled + " stopPingAFterone? " + stopPingingAfterOne + " first? " + first);
          if (cancelled || stopPingingAfterOne && !first)
          {
             return;
@@ -1814,11 +1817,14 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
          first = false;
 
          long now = System.currentTimeMillis();
+         HornetQClientLogger.LOGGER.info(" now is: "  + now + " failureCheckPeriod: " + clientFailureCheckPeriod + " ttl: " + connectionTTL);
 
          if (clientFailureCheckPeriod != -1 && connectionTTL != -1 && now >= lastCheck + connectionTTL)
          {
+            HornetQClientLogger.LOGGER.info("pinger found ttl has reached, need check data");
             if (!connection.checkDataReceived())
             {
+               HornetQClientLogger.LOGGER.info("also check no data received from connection");
 
                // We use a different thread to send the fail
                // but the exception has to be created here to preserve the stack trace
@@ -1835,15 +1841,19 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
                   }
                });
 
+               HornetQClientLogger.LOGGER.info("pinger using thread pool to call connection fail and marked ping canceled.");
+
                return;
             }
             else
             {
                lastCheck = now;
+               HornetQClientLogger.LOGGER.info("as we have received data during this check, update lastCheck time: " + lastCheck);
             }
          }
 
          send();
+         HornetQClientLogger.LOGGER.info("sending out a ping");
       }
 
       /**
