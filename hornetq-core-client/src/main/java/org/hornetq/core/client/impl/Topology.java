@@ -27,6 +27,7 @@ import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClusterTopologyListener;
 import org.hornetq.core.client.HornetQClientLogger;
 import org.hornetq.spi.core.remoting.Connector;
+import org.hornetq.utils.DebugLogger;
 
 /**
  * @author <a href="mailto:andy.taylor@jboss.org">Andy Taylor</a>
@@ -35,6 +36,8 @@ import org.hornetq.spi.core.remoting.Connector;
  */
 public final class Topology implements Serializable
 {
+
+   private static final DebugLogger dlog = DebugLogger.getLogger("bridge.log");
 
    private static final long serialVersionUID = -9037171688692471371L;
 
@@ -187,6 +190,7 @@ public final class Topology implements Serializable
     */
    public boolean updateMember(final long uniqueEventID, final String nodeId, final TopologyMemberImpl memberInput)
    {
+      dlog.log("updating topology " + this + " eventid: " + uniqueEventID + " member: " + memberInput, true, null);
 
       Long deleteTme = getMapDelete().get(nodeId);
       if (deleteTme != null && uniqueEventID != 0 && uniqueEventID < deleteTme)
@@ -218,17 +222,20 @@ public final class Topology implements Serializable
          }
          if (uniqueEventID > currentMember.getUniqueEventID())
          {
+            dlog.log("is a new member");
             TopologyMemberImpl newMember =
                      new TopologyMemberImpl(nodeId, memberInput.getBackupGroupName(), memberInput.getLive(),
                                             memberInput.getBackup());
 
             if (newMember.getLive() == null && currentMember.getLive() != null)
             {
+               dlog.log("new member doesn't have live???, but current: " + currentMember.getLive());
                newMember.setLive(currentMember.getLive());
             }
 
             if (newMember.getBackup() == null && currentMember.getBackup() != null)
             {
+               dlog.log("new member doesn't have backup????, current: " + currentMember.getBackup());
                newMember.setBackup(currentMember.getBackup());
             }
 
@@ -243,6 +250,7 @@ public final class Topology implements Serializable
             newMember.setUniqueEventID(uniqueEventID);
             topology.remove(nodeId);
             topology.put(nodeId, newMember);
+            dlog.log(this + " so updated topology for node: " + nodeId + " old: " + currentMember + " new: " + newMember);
             sendMemberUp(nodeId, newMember);
 
             return true;

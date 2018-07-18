@@ -166,6 +166,7 @@ import org.hornetq.spi.core.protocol.SessionCallback;
 import org.hornetq.spi.core.security.HornetQSecurityManager;
 import org.hornetq.utils.ClassloadingUtil;
 import org.hornetq.utils.ConcurrentHashSet;
+import org.hornetq.utils.DebugLogger;
 import org.hornetq.utils.ExecutorFactory;
 import org.hornetq.utils.HornetQThreadFactory;
 import org.hornetq.utils.OrderedExecutorFactory;
@@ -187,6 +188,7 @@ import static org.hornetq.core.server.impl.QuorumManager.BACKUP_ACTIVATION.STOP;
  */
 public class HornetQServerImpl implements HornetQServer
 {
+   private static final DebugLogger dlog = DebugLogger.getLogger("bridge.log");
    /**
     * JMS Topics (which are outside of the scope of the core API) will require a dumb subscription
     * with a dummy-filter at this current version as a way to keep its existence valid and TCK
@@ -533,6 +535,7 @@ public class HornetQServerImpl implements HornetQServer
             state = SERVER_STATE.STARTED;
             HornetQServerLogger.LOGGER.serverStarted(getVersion().getFullVersion(), nodeManager.getNodeId(),
                                                      identity != null ? identity : "");
+            dlog.log("server started: " + nodeManager.getNodeId() + " tostring: " + this);
          }
          // start connector service
          connectorsService = new ConnectorsService(configuration, storageManager, scheduledPool, postOffice);
@@ -2533,6 +2536,8 @@ public class HornetQServerImpl implements HornetQServer
 
             HornetQServerLogger.LOGGER.backupServerStarted(version.getFullVersion(), nodeManager.getNodeId());
 
+
+            dlog.log("backup server waiting... " + nodeManager.getNodeId() + " tostring: " + HornetQServerImpl.this);
             nodeManager.awaitLiveNode();
 
             configuration.setBackup(false);
@@ -2547,6 +2552,8 @@ public class HornetQServerImpl implements HornetQServer
             clusterManager.activate();
 
             HornetQServerLogger.LOGGER.backupServerIsLive();
+
+            dlog.log("backup server becomes live " + nodeManager.getNodeId() + " tostring: " + HornetQServerImpl.this);
 
             nodeManager.releaseBackup();
             if (configuration.isAllowAutoFailBack())

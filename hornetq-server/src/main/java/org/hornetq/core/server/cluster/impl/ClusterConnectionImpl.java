@@ -65,6 +65,7 @@ import org.hornetq.core.server.group.impl.Response;
 import org.hornetq.core.server.management.ManagementService;
 import org.hornetq.core.server.management.Notification;
 import org.hornetq.spi.core.protocol.RemotingConnection;
+import org.hornetq.utils.DebugLogger;
 import org.hornetq.utils.ExecutorFactory;
 import org.hornetq.utils.FutureLatch;
 import org.hornetq.utils.TypedProperties;
@@ -77,6 +78,8 @@ import org.hornetq.utils.TypedProperties;
  */
 public final class ClusterConnectionImpl implements ClusterConnection, AfterConnectInternalListener
 {
+   private static final DebugLogger dlog = DebugLogger.getLogger("bridge.log");
+
    private static final boolean isTrace = HornetQServerLogger.LOGGER.isTraceEnabled();
 
    private static final int DEFAULT_JMS_MESSAGE_SIZE = 1864;
@@ -614,6 +617,7 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
                              final Pair<TransportConfiguration, TransportConfiguration> connectorPair,
                              final boolean backup)
    {
+      dlog.log("cc got node announce: " + backup + " node: " + nodeID + " pair: " + connectorPair);
       if (HornetQServerLogger.LOGGER.isDebugEnabled())
       {
          HornetQServerLogger.LOGGER.debug(this + "::NodeAnnounced, backup=" + backup + nodeID + connectorPair);
@@ -843,6 +847,7 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
    @Override
    public void nodeUP(final TopologyMember topologyMember, final boolean last)
    {
+      dlog.log("cc receive node up notif...");
       if (stopping)
       {
          return;
@@ -862,12 +867,14 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
             HornetQServerLogger.LOGGER.trace(this + "::informing about backup to itself, nodeUUID=" +
                                                 nodeManager.getNodeId() + ", connectorPair=" + topologyMember + ", this = " + this);
          }
+         dlog.log("it's this node, no processing. " + nodeID);
          return;
       }
 
       // if the node is more than 1 hop away, we do not create a bridge for direct cluster connection
       if (allowDirectConnectionsOnly && !allowableConnections.contains(topologyMember.getLive()))
       {
+         dlog.log("live node doesn't allowed to connect, ignore.... " + allowableConnections);
          return;
       }
 
@@ -885,11 +892,13 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
             HornetQServerLogger.LOGGER.trace(this + " ignoring call with nodeID=" + nodeID + ", topologyMember=" +
                                                 topologyMember + ", last=" + last);
          }
+         dlog.log("it's no live, we don't create bridge to backups, ignore..");
          return;
       }
 
       synchronized (recordsGuard)
       {
+         dlog.log("Now creating a record...");
          try
          {
             MessageFlowRecord record = records.get(nodeID);
@@ -929,11 +938,13 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
             }
             else
             {
+               dlog.log("won't create record because it's already existed for node: " + nodeID);
                if (isTrace)
                {
                   HornetQServerLogger.LOGGER.trace(this + " ignored nodeUp record for " + topologyMember + " on nodeID=" +
                                                       nodeID + " as the record already existed");
                }
+               //here we may update the record (e.g. the connector may changes to backup)
             }
          }
          catch (Exception e)

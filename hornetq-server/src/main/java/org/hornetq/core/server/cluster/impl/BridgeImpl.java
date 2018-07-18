@@ -54,6 +54,7 @@ import org.hornetq.core.server.cluster.Transformer;
 import org.hornetq.core.server.management.Notification;
 import org.hornetq.core.server.management.NotificationService;
 import org.hornetq.spi.core.protocol.RemotingConnection;
+import org.hornetq.utils.DebugLogger;
 import org.hornetq.utils.FutureLatch;
 import org.hornetq.utils.ReusableLatch;
 import org.hornetq.utils.TypedProperties;
@@ -71,6 +72,7 @@ import org.hornetq.utils.UUID;
 
 public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowledgementHandler
 {
+   private static final DebugLogger dlog = DebugLogger.getLogger("bridge.log");
    // Constants -----------------------------------------------------
 
    private static final boolean isTrace = HornetQServerLogger.LOGGER.isTraceEnabled();
@@ -728,6 +730,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
    public void connectionFailed(final HornetQException me, boolean failedOver)
    {
+      dlog.log("bridge got failure event", true, me);
       HornetQServerLogger.LOGGER.bridgeConnectionFailed(me, failedOver);
 
       synchronized (connectionGuard)
@@ -979,6 +982,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
    /* This is called only when the bridge is activated */
    protected void connect()
    {
+      dlog.log("connecting bridge: " + csf);
       if (stopping)
          return;
 
@@ -997,9 +1001,11 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
             {
                if (stopping)
                   return;
+               dlog.log("creating a brand new csf....");
                csf = createSessionFactory();
                if (csf == null)
                {
+                  dlog.log("not successful, retrying...");
                   // Retrying. This probably means the node is not available (for the cluster connection case)
                   scheduleRetryConnect();
                   return;
@@ -1008,6 +1014,8 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
                session = (ClientSessionInternal)csf.createSession(user, password, false, true, true, true, 1);
                sessionConsumer = (ClientSessionInternal)csf.createSession(user, password, false, true, true, true, 1);
             }
+
+            dlog.log("using csf to go on: " + csf);
 
             if (forwardingAddress != null)
             {
@@ -1057,6 +1065,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
             queue.addConsumer(BridgeImpl.this);
             queue.deliverAsync();
 
+            dlog.log("ok bridge connected: " + csf);
             HornetQServerLogger.LOGGER.bridgeConnected(this);
 
             // We only do this on plain core bridges

@@ -23,13 +23,12 @@ import org.hornetq.core.config.CoreQueueConfiguration;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.settings.impl.AddressSettings;
 import org.hornetq.tests.integration.cluster.util.MultiServerTestBase;
-import org.hornetq.utils.UUIDGenerator;
 import org.junit.Test;
 
-import java.util.Map;
 import java.util.UUID;
 
-public class ClusterBridgeSharedStoreTwoPairFailoverTest extends MultiServerTestBase {
+public class ClusterBridgeSharedStoreTwoPairFailoverTest extends MultiServerTestBase
+{
 
    final String TEST_QUEUE = "cluster-queues";
 
@@ -103,24 +102,32 @@ public class ClusterBridgeSharedStoreTwoPairFailoverTest extends MultiServerTest
 
    }
 
-   private void sendReceiveMessage(ClientSession sendSession, ClientSession receiveSession) throws HornetQException {
+   private void sendReceiveMessage(ClientSession sendSession, ClientSession receiveSession) throws HornetQException
+   {
 
       ClientConsumer consumer = receiveSession.createConsumer(TEST_QUEUE);
       ClientProducer producer = null;
       int retryCount = 20;
       final String mid = UUID.randomUUID().toString();
-      while (retryCount > 0) {
-         try {
+      while (retryCount > 0)
+      {
+         try
+         {
             producer = sendSession.createProducer(TEST_QUEUE);
 
             ClientMessage m = sendSession.createMessage(true);
             m.putStringProperty("myid", mid);
             producer.send(m);
             break;
-         } catch (HornetQException e) {
+         }
+         catch (HornetQException e)
+         {
             retryCount--;
-         } finally {
-            if (producer != null) {
+         }
+         finally
+         {
+            if (producer != null)
+            {
                producer.close();
             }
          }

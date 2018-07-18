@@ -53,6 +53,7 @@ import org.hornetq.spi.core.protocol.ProtocolManager;
 import org.hornetq.spi.core.protocol.RemotingConnection;
 import org.hornetq.spi.core.remoting.Acceptor;
 import org.hornetq.spi.core.remoting.Connection;
+import org.hornetq.utils.DebugLogger;
 
 /**
  * A CoreProtocolManager
@@ -61,6 +62,8 @@ import org.hornetq.spi.core.remoting.Connection;
  */
 class CoreProtocolManager implements ProtocolManager
 {
+   private static final DebugLogger dlog = DebugLogger.getLogger("bridge.log");
+
    private static final boolean isTrace = HornetQServerLogger.LOGGER.isTraceEnabled();
 
    private final HornetQServer server;
@@ -303,6 +306,7 @@ class CoreProtocolManager implements ProtocolManager
          {
             NodeAnnounceMessage msg = (NodeAnnounceMessage)packet;
 
+            dlog.log("received a nodeAnnouncement packet, is backup? " + msg.isBackup());
             Pair<TransportConfiguration, TransportConfiguration> pair;
             if (msg.isBackup())
             {
@@ -322,6 +326,7 @@ class CoreProtocolManager implements ProtocolManager
                ClusterConnection clusterConn = acceptorUsed.getClusterConnection();
                if (clusterConn != null)
                {
+                  dlog.log("call cc.nodeAnnouned");
                   clusterConn.nodeAnnounced(msg.getCurrentEventID(), msg.getNodeID(), msg.getNodeName(), pair, msg.isBackup());
                }
                else

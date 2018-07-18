@@ -59,6 +59,7 @@ import org.hornetq.core.protocol.core.impl.PacketDecoder;
 import org.hornetq.core.remoting.FailureListener;
 import org.hornetq.spi.core.remoting.Connector;
 import org.hornetq.utils.ClassloadingUtil;
+import org.hornetq.utils.DebugLogger;
 import org.hornetq.utils.HornetQThreadFactory;
 import org.hornetq.utils.UUIDGenerator;
 
@@ -70,6 +71,8 @@ import org.hornetq.utils.UUIDGenerator;
  */
 public final class ServerLocatorImpl implements ServerLocatorInternal, DiscoveryListener, Serializable
 {
+   private static final DebugLogger dlog = DebugLogger.getLogger("bridge.log");
+
    /*needed for backward compatibility*/
    @SuppressWarnings("unused")
    private final Set<ClusterTopologyListener> topologyListeners = new HashSet<ClusterTopologyListener>();
@@ -696,6 +699,7 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
 
    public ClientSessionFactory createSessionFactory(String nodeID) throws Exception
    {
+      dlog.log("creating a csf to node: " + nodeID);
       TopologyMember topologyMember = topology.getMember(nodeID);
 
       if (HornetQClientLogger.LOGGER.isTraceEnabled())
@@ -703,23 +707,29 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
          HornetQClientLogger.LOGGER.trace("Creating connection factory towards " + nodeID + " = " + topologyMember + ", topology=" + topology.describe());
       }
 
+      dlog.log("topology now: " + topology.describe());
+
       if (topologyMember == null)
       {
          return null;
       }
       if (topologyMember.getLive() != null)
       {
+         dlog.log("creating csf using live: " + topologyMember.getLive());
          ClientSessionFactoryInternal factory = (ClientSessionFactoryInternal)createSessionFactory(topologyMember.getLive());
          if (topologyMember.getBackup() != null)
          {
             factory.setBackupConnector(topologyMember.getLive(), topologyMember.getBackup());
          }
+         dlog.log("ok factory created using live: " + factory);
          return factory;
       }
       if (topologyMember.getLive() == null && topologyMember.getBackup() != null)
       {
+         dlog.log("live is null so using backup: " + topologyMember.getBackup());
          // This shouldn't happen, however I wanted this to consider all possible cases
          ClientSessionFactoryInternal factory = (ClientSessionFactoryInternal)createSessionFactory(topologyMember.getBackup());
+         dlog.log("ok factory created using backup: " + factory);
          return factory;
       }
       // it shouldn't happen
