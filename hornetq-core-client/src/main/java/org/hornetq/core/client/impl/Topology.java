@@ -189,6 +189,7 @@ public final class Topology implements Serializable
       HornetQClientLogger.LOGGER.info("updating topology " + this + " eventid: " + uniqueEventID + " member: " + memberInput);
 
       Long deleteTme = getMapDelete().get(nodeId);
+      HornetQClientLogger.LOGGER.info("deleteTme: " + deleteTme);
       if (deleteTme != null && uniqueEventID != 0 && uniqueEventID < deleteTme)
       {
          HornetQClientLogger.LOGGER.info("Update uniqueEvent=" + uniqueEventID +

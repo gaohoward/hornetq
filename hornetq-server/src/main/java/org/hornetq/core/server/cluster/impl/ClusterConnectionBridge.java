@@ -146,14 +146,14 @@ public class ClusterConnectionBridge extends BridgeImpl
          logger.trace("Setting up bridge between " + clusterConnection.getConnector() + " and " + targetLocator,
                                           new Exception("trace"));
       }
-      HornetQServerLogger.LOGGER.info("new cc bridge, targetLocator: " + targetLocator, true, null);
+      HornetQServerLogger.LOGGER.info("new cc bridge, targetLocator: " + targetLocator);
    }
 
    @Override
    public void stop() throws Exception
    {
       //find out who initiate the stop
-      HornetQServerLogger.LOGGER.info("now stopping the cc bridge: " + this.serverLocator, true, null);
+      HornetQServerLogger.LOGGER.info("now stopping the cc bridge: " + this.serverLocator);
       super.stop();
    }
 

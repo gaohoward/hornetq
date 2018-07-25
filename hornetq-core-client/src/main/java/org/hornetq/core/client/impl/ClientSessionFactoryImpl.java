@@ -1492,7 +1492,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
          HornetQClientLogger.LOGGER.debug("Announcing node " + serverLocator.getNodeID() + ", isBackup=" + isBackup);
       }
       channel0.send(new NodeAnnounceMessage(currentEventID, nodeID, nodeName, isBackup, config, backupConfig));
-      HornetQClientLogger.LOGGER.info("sent out a nodeAnounce: " + nodeID + " isbackup? " + isBackup + " over ch0: " + channel0);
+      HornetQClientLogger.LOGGER.info("sent out a nodeAnounce: " + nodeID + " isbackup? " + isBackup + " over ch0: " + channel0.getConnection());
    }
 
    @Override

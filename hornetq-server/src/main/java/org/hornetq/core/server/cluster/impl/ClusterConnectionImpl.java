@@ -844,7 +844,7 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
    @Override
    public void nodeUP(final TopologyMember topologyMember, final boolean last)
    {
-      HornetQServerLogger.LOGGER.info("cc receive node up notif...");
+      HornetQServerLogger.LOGGER.info("cc receive node up notif... " + topologyMember.getNodeId());
       if (stopping)
       {
          return;
