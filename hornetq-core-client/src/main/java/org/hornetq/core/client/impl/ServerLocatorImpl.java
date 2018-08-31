@@ -599,7 +599,7 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
       clusterTransportConfiguration = locator.clusterTransportConfiguration;
    }
 
-   private synchronized TransportConfiguration selectConnector()
+   private synchronized Pair<TransportConfiguration, TransportConfiguration> selectConnector()
    {
       Pair<TransportConfiguration, TransportConfiguration>[] usedTopology;
 
@@ -618,7 +618,7 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
          int pos = loadBalancingPolicy.select(usedTopology.length);
          Pair<TransportConfiguration, TransportConfiguration> pair = usedTopology[pos];
 
-         return pair.getA();
+         return pair;
       }
       else
       {
@@ -630,7 +630,7 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
 
          int pos = loadBalancingPolicy.select(initialConnectors.length);
 
-         return initialConnectors[pos];
+         return new Pair(initialConnectors[pos], null);
       }
    }
 
@@ -870,7 +870,7 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
          {
             retry = false;
 
-            TransportConfiguration tc = selectConnector();
+            Pair<TransportConfiguration, TransportConfiguration> tc = selectConnector();
             if (tc == null)
             {
                throw HornetQClientMessageBundle.BUNDLE.noTCForSessionFactory();
@@ -916,7 +916,7 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
                   synchronized (topologyArrayGuard)
                   {
 
-                     if (topologyArray != null && attempts == topologyArray.length)
+                     if (topologyArray != null && attempts >= topologyArray.length)
                      {
                         throw HornetQClientMessageBundle.BUNDLE.cannotConnectToServers();
                      }
@@ -1581,7 +1581,6 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
             {
                // Resetting the topology to its original condition as it was brand new
                receivedTopology = false;
-               topologyArray = null;
             }
             else
             {
@@ -1667,6 +1666,13 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
       {
          Collection<TopologyMemberImpl> membersCopy = topology.getMembers();
 
+         if (membersCopy.size() == 0)
+         {
+            //it could happen when live is down, in that case we keeps the old copy
+            //and don't update
+            return;
+         }
+
          Pair<TransportConfiguration, TransportConfiguration>[] topologyArrayLocal =
             (Pair<TransportConfiguration, TransportConfiguration>[])Array.newInstance(Pair.class,
                                                                                       membersCopy.size());
@@ -1747,8 +1753,6 @@ public final class ServerLocatorImpl implements ServerLocatorInternal, Discovery
             synchronized (topologyArrayGuard)
             {
                receivedTopology = false;
-
-               topologyArray = null;
             }
          }
       }
